@@ -106,8 +106,8 @@ async function runCli(input: string) {
     },
   );
   const [stdout, stderr, exitCode] = await Promise.all([
-    proc.stdout.text(),
-    proc.stderr.text(),
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
     proc.exited,
   ]);
   return { stdout, stderr, exitCode };
