@@ -83,6 +83,7 @@ const store = reactive({
 let graphLayout;
 let graphStructure = "";
 let graphNodes = [];
+let graphLanes;
 let graphPane = "";
 // The berth whose route is currently set, and whether a redraw was held back
 // while it was — see updateGraph.
@@ -123,15 +124,13 @@ function taskStructure(tasks) {
     .join("|");
 }
 
-function updateGraph(tasks) {
+function updateGraph(tasks, lanes) {
   const graphTasks = Array.isArray(tasks) ? tasks : [];
-  const structure = taskStructure(graphTasks);
+  const structure = JSON.stringify([taskStructure(graphTasks), lanes ?? []]);
   const box = paneBox();
   const pane = `${box.availableWidth}x${box.availableHeight}`;
   // Keep coordinates frozen while polling changes only live task state. The pane
-  // box joins the structure in that key because the roads spread to fill its
-  // height and the gaps compress to fit its width, so a resize is the one other
-  // thing that has to move them.
+  // box and declared lanes join the key because both affect road placement.
   const moved =
     !graphLayout || structure !== graphStructure || pane !== graphPane;
 
@@ -149,7 +148,7 @@ function updateGraph(tasks) {
   }
 
   if (moved) {
-    graphLayout = layoutGraph(graphTasks, box);
+    graphLayout = layoutGraph(graphTasks, { ...box, lanes });
     graphStructure = structure;
     graphPane = pane;
   }
@@ -238,7 +237,7 @@ function bindGraphHover(container) {
     hoverRef = null;
     paintLineage(container, null);
     // Whatever the panel held back while the route was set lands now.
-    if (graphHeld) updateGraph(store.tree.tasks);
+    if (graphHeld) updateGraph(store.tree.tasks, graphLanes);
   });
 }
 
@@ -261,7 +260,8 @@ async function loadTree() {
       waves: { ...emptyWaves(), ...(payload.waves ?? {}) },
       errors: Array.isArray(payload.errors) ? payload.errors : [],
     });
-    updateGraph(store.tree.tasks);
+    graphLanes = payload.deckSource === "graph" ? payload.buckets : undefined;
+    updateGraph(store.tree.tasks, graphLanes);
     store.loadError = null;
   } catch (error) {
     store.loadError =
@@ -294,7 +294,7 @@ function syncUsage(usage) {
   // The graph is an HTML string, not a reactive template, so a new token count
   // only reaches a node when the SVG is rebuilt. The layout is cached, so this
   // redraws the same coordinates with fresh numbers.
-  updateGraph(store.tree.tasks);
+  updateGraph(store.tree.tasks, graphLanes);
 }
 
 /**
@@ -409,7 +409,7 @@ createApp(store).mount("#app");
 const graphMount = document.querySelector(".deck-top");
 if (graphMount) bindGraphHover(graphMount);
 // The roads spread to the pane, so the pane changing size is a relayout.
-window.addEventListener("resize", () => updateGraph(graphNodes));
+window.addEventListener("resize", () => updateGraph(graphNodes, graphLanes));
 window.__flightdeck = store;
 
 connectEvents({

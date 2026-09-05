@@ -252,13 +252,12 @@ export function layoutGraph(nodes, opts = {}) {
 
   const drawn = drawableEdges(orderedNodes, new Set(cyclic));
 
-  // One road per bucket, in the order /api/tree already sorted them into. The
-  // road is the only thing that decides y: a task never leaves its bucket's
-  // line, which is what makes a crossover mean "this dependency left its
-  // bucket" rather than "the layout needed the room".
-  const roadNames = [];
-  const roadOf = new Map();
-  for (const node of orderedNodes) {
+  // Declared roads retain empty lanes; without declarations, task order decides.
+  const roadNames = options.lanes?.length ? [...options.lanes] : [];
+  const roadOf = new Map(roadNames.map((name, index) => [name, index]));
+  for (const node of options.lanes?.length && Array.isArray(nodes)
+    ? nodes
+    : orderedNodes) {
     const bucket = node.bucket ?? "";
     if (!roadOf.has(bucket)) {
       roadOf.set(bucket, roadNames.length);

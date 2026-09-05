@@ -27,6 +27,151 @@ function compare(nodes) {
     .map(({ ref }) => ref);
 }
 
+describe("declared roads", () => {
+  const nodes = [
+    makeNode("verify/02", "verify", "02"),
+    makeNode("scout/01", "scout", "01"),
+    makeNode("verify/01", "verify", "01"),
+  ];
+
+  test("preserves declared order, including empty roads", () => {
+    const lanes = ["verify", "build", "scout"];
+    const layout = layoutGraph(nodes, { lanes });
+
+    expect(layout.roads.map(({ name }) => name)).toEqual(lanes);
+    expect([...layout.roadOf]).toEqual([
+      ["verify", 0], ["build", 1], ["scout", 2],
+    ]);
+    expect(
+      [...layout.positions.values()].filter(({ road }) => road === 1),
+    ).toEqual([]);
+    expect(layout.extent.height).toBeGreaterThan(
+      layoutGraph(nodes).extent.height,
+    );
+    const svg = renderGraph(nodes, layout);
+    expect(
+      [...svg.matchAll(/class="graph-road" data-road="([^"]+)"/g)]
+        .map((match) => match[1]),
+    ).toEqual(lanes);
+    expect(svg).toMatch(/data-road="build">\s*<line class="rail"/);
+    expect(svg.match(/>build<\/text>/g)).toHaveLength(2);
+  });
+
+  test("appends undeclared buckets in input order", () => {
+    const layout = layoutGraph(nodes, { lanes: ["build"] });
+    expect(layout.roads.map(({ name }) => name)).toEqual([
+      "build", "verify", "scout",
+    ]);
+    expect([...layout.positions.keys()]).toEqual(compare(nodes));
+    expect(layout.positions.get("verify/01").road).toBe(1);
+    expect(layout.positions.get("scout/01").road).toBe(2);
+  });
+
+  test("draws declared roads before any nodes arrive", () => {
+    const lanes = ["scout", "build", "verify"];
+    const layout = layoutGraph([], { lanes });
+    expect(layout.roads.map(({ name }) => name)).toEqual(lanes);
+    expect([...layout.positions]).toEqual([]);
+    expect(renderGraph([], layout).match(/class="graph-road"/g))
+      .toHaveLength(3);
+  });
+
+  test("keeps duplicate declarations verbatim", () => {
+    const lanes = ["verify", "build", "verify", "scout"];
+    expect(layoutGraph(nodes, { lanes }).roads.map(({ name }) => name))
+      .toEqual(lanes);
+  });
+
+  test("keeps the existing layout when lanes are absent or empty", () => {
+    const baseline = layoutGraph(nodes);
+    expect(baseline.roads.map(({ name }) => name)).toEqual(["scout", "verify"]);
+    expect([...baseline.slots]).toEqual([
+      ["scout/01", 0], ["verify/01", 0], ["verify/02", 1],
+    ]);
+    expect(layoutGraph(nodes, { lanes: [] })).toEqual(baseline);
+    expect(layoutGraph([...nodes].reverse())).toEqual(baseline);
+  });
+
+  test("keeps task ordering within each road", () => {
+    const layout = layoutGraph(nodes, { lanes: ["verify", "scout"] });
+    expect([...layout.positions.keys()]).toEqual(compare(nodes));
+    expect(nodes.map(({ ref }) => layout.slots.get(ref))).toEqual(
+      nodes.map(({ ref }) => layoutGraph(nodes).slots.get(ref)),
+    );
+  });
+});
+
+test("the app uses deckSource for road order across polling and resize", async () => {
+  const saved = Object.getOwnPropertyDescriptors(globalThis);
+  const listeners = new Map();
+  const pane = { clientWidth: 900, clientHeight: 400 };
+  let payload = {
+    deckSource: "graph",
+    buckets: ["verify", "build", "scout"],
+    tasks: [
+      makeNode("scout/01", "scout", "01"),
+      makeNode("verify/01", "verify", "01"),
+    ],
+  };
+  const replacements = {
+    document: {
+      hidden: true,
+      querySelector: (selector) =>
+        selector === ".c-dependency-graph" ? pane : null,
+      addEventListener() {},
+    },
+    window: {
+      addEventListener: (name, callback) => listeners.set(name, callback),
+    },
+    getComputedStyle: () => ({
+      paddingBlockStart: "0",
+      paddingBlockEnd: "0",
+      paddingInlineStart: "0",
+      paddingInlineEnd: "0",
+    }),
+    fetch: async () => ({ ok: true, json: async () => payload }),
+    EventSource: class { addEventListener() {} },
+  };
+
+  try {
+    for (const [key, value] of Object.entries(replacements)) {
+      Object.defineProperty(globalThis, key, {
+        configurable: true, writable: true, value,
+      });
+    }
+    const { loadTree, store } = await import("../app.js");
+    const roads = () => [
+      ...store.graphSvg.matchAll(/class="graph-road" data-road="([^"]+)"/g),
+    ].map((match) => match[1]);
+
+    await loadTree();
+    expect(roads()).toEqual(["verify", "build", "scout"]);
+    payload.buckets = ["scout", "verify", "build"];
+    await loadTree();
+    expect(roads()).toEqual(payload.buckets);
+    pane.clientHeight = 600;
+    listeners.get("resize")();
+    expect(roads()).toEqual(payload.buckets);
+
+    payload = { ...payload, deckSource: "tasks", source: "graph" };
+    await loadTree();
+    expect(roads()).toEqual(["scout", "verify"]);
+    expect(store.graphSvg).toBe(renderGraph(payload.tasks,
+      layoutGraph(payload.tasks, {
+        availableWidth: 900, availableHeight: 600,
+      }),
+    ));
+    pane.clientHeight = 400;
+    listeners.get("resize")();
+    expect(roads()).toEqual(["scout", "verify"]);
+  } finally {
+    for (const key of Object.keys(replacements)) {
+      if (saved[key]) Object.defineProperty(globalThis, key, saved[key]);
+      else delete globalThis[key];
+    }
+  }
+});
+
 describe("relatedRefs", () => {
   //  A ──→ B ──→ D        E is unrelated to the A/B/C/D lineage.
   //   └──→ C ──→ D
