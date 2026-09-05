@@ -7,7 +7,7 @@
 >
 > **Depends on**: contract/01, contract/02
 > **Blocks**: deck/01, skill/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -137,28 +137,28 @@ followed by someone with no other context.
 
 ## Acceptance criteria
 
-- [ ] The file `packages/dispatch/skills/autopilot/references/graph-contract.md` exists and opens by stating that the graph is declared before the run and the events are written during it, with the no-filesystem-access reason.
-- [ ] All seven required sections are present, in the specified order.
-- [ ] Every `graph.json` field is explicitly marked required, or optional with its default stated.
-- [ ] The node-ref shape appears as a regex, and every ref in the document matches it.
-- [ ] The validation list is complete and matches the loader's stated behaviour, with no rule added and none omitted.
-- [ ] The all-or-nothing rule and the drop-and-report rule are presented together as one asymmetry, with the reason for each side.
-- [ ] All three trail entry kinds appear as TypeScript types, and every CLI command is reproduced verbatim.
-- [ ] The state-resolution order appears as five numbered steps, followed by the never-complete-while-invalid guarantee.
-- [ ] Each of the three attribution facts is paired with a concrete author action.
-- [ ] The worked example carries both a graph and matching trail lines.
-- [ ] No instruction in the document requires opening source code to follow.
+- [x] The file `packages/dispatch/skills/autopilot/references/graph-contract.md` exists and opens by stating that the graph is declared before the run and the events are written during it, with the no-filesystem-access reason.
+- [x] All seven required sections are present, in the specified order.
+- [x] Every `graph.json` field is explicitly marked required, or optional with its default stated.
+- [x] The node-ref shape appears as a regex, and every ref in the document matches it.
+- [x] The validation list is complete and matches the loader's stated behaviour, with no rule added and none omitted.
+- [x] The all-or-nothing rule and the drop-and-report rule are presented together as one asymmetry, with the reason for each side.
+- [x] All three trail entry kinds appear as TypeScript types, and every CLI command is reproduced verbatim.
+- [x] The state-resolution order appears as five numbered steps, followed by the never-complete-while-invalid guarantee.
+- [x] Each of the three attribution facts is paired with a concrete author action.
+- [x] The worked example carries both a graph and matching trail lines.
+- [x] No instruction in the document requires opening source code to follow.
 
 ## Verification
 
 This task writes prose, so its gates are read-throughs — but each one is a
 concrete check, not an impression.
 
-- [ ] Read the document beside `../_context/contract.md` and confirm no normative statement contradicts it. List any place the specification resolves an ambiguity the context file left open.
-- [ ] For every identifier, type name, CLI flag, and path quoted in the document, grep the source file it comes from and confirm the spelling matches exactly. A type that has drifted from its source is a correctness failure, not a typo.
-- [ ] Check every node ref in the worked example against the ref regex the document itself states.
-- [ ] Walk the conformance checklist against the worked example and confirm the example passes every item.
-- [ ] Confirm the document names no task file and no plan document — it must stand alone for a reader outside this project.
+- [x] Read the document beside `../_context/contract.md` and confirm no normative statement contradicts it. List any place the specification resolves an ambiguity the context file left open.
+- [x] For every identifier, type name, CLI flag, and path quoted in the document, grep the source file it comes from and confirm the spelling matches exactly. A type that has drifted from its source is a correctness failure, not a typo.
+- [x] Check every node ref in the worked example against the ref regex the document itself states.
+- [x] Walk the conformance checklist against the worked example and confirm the example passes every item.
+- [x] Confirm the document names no task file and no plan document — it must stand alone for a reader outside this project.
 
 ## Eval rubric
 
