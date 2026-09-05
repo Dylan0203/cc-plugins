@@ -7,7 +7,7 @@
 >
 > **Depends on**: contract/01
 > **Blocks**: contract/03, deck/01
-> **Status**: todo
+> **Status**: done
 
 > **Ordering note**: this task depends on the event-kind task not because it
 > needs its output, but because both edit `fleet.ts` and its test. Parallel
@@ -144,21 +144,21 @@ The new test file covers the adapter and the readiness helper with in-memory fix
 
 ## Acceptance criteria
 
-- [ ] `graph-node.ts` exports `GraphNode`, `NodeValidity`, `nodesFromParsedTasks`, and `unmetNodeDependencies`
-- [ ] `nodesFromParsedTasks` maps every declared field, with `dependsOn` and `blocks` stringified through `refToString` and `validity` passed through from `taskValidity` untransformed
-- [ ] `unmetNodeDependencies` returns a ref for each of the three unmet cases — dependency missing from the map, dependency `unfinished`, dependency `invalid` — and an empty array when every dependency is `complete`
-- [ ] `deriveTaskViews` accepts `Record<string, GraphNode>` and no longer imports `ParsedTask`, `taskValidity`, `refToString`, or `unmetDependencies`
-- [ ] The state ladder in `deriveTaskViews` has the same branches in the same order as before this task, and every field of the returned view is unchanged
-- [ ] `loadPlan` converts before handing off, and the exported `Loaded` type's `byRef` is the narrow node map
-- [ ] The flightplan library is not modified by this task
-- [ ] Both existing test files pass with only their fixture factories changed — no assertion edited or deleted
+- [x] `graph-node.ts` exports `GraphNode`, `NodeValidity`, `nodesFromParsedTasks`, and `unmetNodeDependencies`
+- [x] `nodesFromParsedTasks` maps every declared field, with `dependsOn` and `blocks` stringified through `refToString` and `validity` passed through from `taskValidity` untransformed
+- [x] `unmetNodeDependencies` returns a ref for each of the three unmet cases — dependency missing from the map, dependency `unfinished`, dependency `invalid` — and an empty array when every dependency is `complete`
+- [x] `deriveTaskViews` accepts `Record<string, GraphNode>` and no longer imports `ParsedTask`, `taskValidity`, `refToString`, or `unmetDependencies`
+- [x] The state ladder in `deriveTaskViews` has the same branches in the same order as before this task, and every field of the returned view is unchanged
+- [x] `loadPlan` converts before handing off, and the exported `Loaded` type's `byRef` is the narrow node map
+- [x] The flightplan library is not modified by this task
+- [x] Both existing test files pass with only their fixture factories changed — no assertion edited or deleted
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` — passes, with the same test count as before plus the new file's tests
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/` — passes, unchanged
-- [ ] `bunx --bun tsc --noEmit | grep packages/dispatch` — prints nothing. Run it against the root `tsconfig.json`; naming files on the command line drops the config and produces a dozen fake undefined-name errors. The repo-wide run is **not** green (86 pre-existing errors elsewhere), so zero total is not the bar — nothing under this grep is
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/graph-node.test.ts` — the new tests pass on their own
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` — passes, with the same test count as before plus the new file's tests
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/` — passes, unchanged
+- [x] `bunx --bun tsc --noEmit | grep packages/dispatch` — prints nothing. Run it against the root `tsconfig.json`; naming files on the command line drops the config and produces a dozen fake undefined-name errors. The repo-wide run is **not** green (86 pre-existing errors elsewhere), so zero total is not the bar — nothing under this grep is
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/graph-node.test.ts` — the new tests pass on their own
 
 ## Eval rubric
 
