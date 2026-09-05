@@ -62,8 +62,11 @@ export function validatePlanDir(
     };
   }
 
-  if (detectSource(planDir).kind === "none") {
-    return { ok: false, message: "--plan must contain a tasks/ directory or a graph.json file" };
+  if (detectSource(planDir) === "none") {
+    return {
+      ok: false,
+      message: "--plan must contain a tasks/ directory or a graph.json file",
+    };
   }
 
   return { ok: true };

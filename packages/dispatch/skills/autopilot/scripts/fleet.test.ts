@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { GraphNode, NodeValidity } from "./graph-node";
+import type { GraphNode, NodeValidity } from "../../flightplan/scripts/lib/graph-node";
 import type {
   FlightlogEntry,
   ScoreEntry,

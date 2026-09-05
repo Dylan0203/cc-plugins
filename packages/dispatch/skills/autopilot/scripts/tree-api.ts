@@ -3,18 +3,22 @@ import { basename, dirname, join } from "node:path";
 import { loadAllTasks } from "../../flightplan/scripts/next-ready";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import { readLog, runLogPath } from "../../flightplan/scripts/lib/flightlog";
-import { type GraphNode, nodesFromParsedTasks } from "./graph-node";
+import {
+  type GraphNode,
+  nodesFromParsedTasks,
+} from "../../flightplan/scripts/lib/graph-node";
 import { deriveTaskViews, type TaskState, type TaskView } from "./fleet";
+import type { DeckSourceKind, PlanError } from "./graph-source";
 import { repoRootOf } from "./usage-source";
 import { summarizeWaves, type WaveSummary } from "./waves";
 
 export type Loaded = {
   byRef: Record<string, GraphNode>;
-  errors: { file: string; bucket: string; reason: string }[];
+  errors: PlanError[];
 };
 
 export type TreePayload = {
-  deckSource: "tasks" | "graph";
+  deckSource: DeckSourceKind;
   slug: string;
   planTitle: string;
   /** Repo the plan lives in — empty when the plan sits outside one. */
@@ -35,7 +39,7 @@ export type TreePayload = {
   };
   /** How the remaining work splits into wave-loop passes. */
   waves: WaveSummary;
-  errors: { file: string; bucket: string; reason: string }[];
+  errors: PlanError[];
 };
 
 /**
@@ -106,7 +110,7 @@ const COUNT_KEY = {
 
 /** Pure: shapes the response. */
 export function buildTreePayload(input: {
-  deckSource?: "tasks" | "graph";
+  deckSource?: DeckSourceKind;
   slug: string;
   planTitle: string;
   repo: string;
@@ -132,7 +136,10 @@ export function buildTreePayload(input: {
     planTitle: input.planTitle,
     repo: input.repo,
     // Directory order is meaningless; declared graph lanes are the author's road order.
-    buckets: input.deckSource === "graph" ? [...input.bucketDirs] : [...input.bucketDirs].sort(),
+    buckets:
+      input.deckSource === "graph"
+        ? [...input.bucketDirs]
+        : [...input.bucketDirs].sort(),
     tasks,
     counts,
     waves: summarizeWaves(tasks, input.entries),

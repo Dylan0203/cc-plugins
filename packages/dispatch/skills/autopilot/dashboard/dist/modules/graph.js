@@ -255,6 +255,9 @@ export function layoutGraph(nodes, opts = {}) {
   // Declared roads retain empty lanes; without declarations, task order decides.
   const roadNames = options.lanes?.length ? [...options.lanes] : [];
   const roadOf = new Map(roadNames.map((name, index) => [name, index]));
+  // Undeclared buckets append in input order, not depth order — see the
+  // "appends undeclared buckets in input order" test. In graph mode the loader
+  // rejects an undeclared lane, so this appends nothing there.
   for (const node of options.lanes?.length && Array.isArray(nodes)
     ? nodes
     : orderedNodes) {

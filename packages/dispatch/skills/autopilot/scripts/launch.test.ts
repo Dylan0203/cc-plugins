@@ -63,7 +63,7 @@ describe("detectSource and validatePlanDir", () => {
       const dir = scratch();
       if (shape === "tasks" || shape === "both") mkdirSync(join(dir, "tasks"));
       if (shape === "graph" || shape === "both") writeFileSync(join(dir, "graph.json"), "{}");
-      expect(detectSource(dir)).toEqual({ kind: shape === "both" ? "tasks" : shape });
+      expect(detectSource(dir)).toBe(shape === "both" ? "tasks" : shape);
       expect(validatePlanDir(dir)).toEqual(shape === "none"
         ? { ok: false, message: "--plan must contain a tasks/ directory or a graph.json file" }
         : { ok: true });
@@ -74,7 +74,7 @@ describe("detectSource and validatePlanDir", () => {
     const dir = scratch();
     writeFileSync(join(dir, "tasks"), "");
     mkdirSync(join(dir, "graph.json"));
-    expect(detectSource(dir)).toEqual({ kind: "none" });
+    expect(detectSource(dir)).toBe("none");
     expect(validatePlanDir(dir)).toEqual({ ok: false, message: "--plan must contain a tasks/ directory or a graph.json file" });
   });
 

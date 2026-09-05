@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { parseLines } from "../../flightplan/scripts/lib/flightlog";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import { aggregateFleet } from "./fleet";
+import type { DeckSourceKind } from "./graph-source";
 import { nextCursor, readRange, splitCompleteLines } from "./tail";
 import {
   attachCodexUsage,
@@ -101,7 +102,7 @@ export function eventsHandler(
   options?: {
     projectsRoot?: string;
     repoRoot?: string;
-    deckSource?: "tasks" | "graph";
+    deckSource?: DeckSourceKind;
     source?: TranscriptSource;
     codexRoot?: string;
     codexSource?: CodexSource;
@@ -124,7 +125,11 @@ export function eventsHandler(
   const repoRoot = options?.repoRoot || repoRootOf(planDir);
   const usageSource =
     options?.source ??
-    createTranscriptSource(planDir, options?.projectsRoot, repoRoot ?? undefined);
+    createTranscriptSource(
+      planDir,
+      options?.projectsRoot,
+      repoRoot ?? undefined,
+    );
   // The codex side is optional in the same way: a plan with no external engine gets
   // an empty list, and the join then attaches nothing.
   const codexSource =
@@ -145,10 +150,9 @@ export function eventsHandler(
   function readAgents(): AgentUsage[] {
     try {
       // run.id lives beside graph.json; the log lives one level below in .flightlog/.
-      const runId = options?.deckSource === "graph"
-        ? readRunId(planDir)
-        : undefined;
-      if (options?.deckSource === "graph" && runId === undefined) return [];
+      const graph = options?.deckSource === "graph";
+      const runId = graph ? readRunId(planDir) : undefined;
+      if (graph && runId === undefined) return [];
       const agents = usageSource.read(runId);
       if (repoRoot === null) return agents;
       // Wrapped separately: a codex tree that cannot be read must cost the Claude

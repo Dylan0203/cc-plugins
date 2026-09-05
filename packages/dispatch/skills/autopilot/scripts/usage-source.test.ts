@@ -270,28 +270,38 @@ describe("createTranscriptSource", () => {
       jsonl(agentPath(projectsRoot, projectSlug(explicitRoot), "other"), [
         announceUser(explicitRoot, "other/01", "dev"),
       ]);
-      const agents = createTranscriptSource(planDir, projectsRoot, explicitRoot).read();
+      const agents = createTranscriptSource(
+        planDir,
+        projectsRoot,
+        explicitRoot,
+      ).read();
       expect(agents.map((agent) => agent.task)).toEqual(["explicit/01"]);
       expect(agents[0]!.counts.input).toBe(7);
     });
   });
 
-  test.each(["existing", "deleted"] as const)("explicit %s root outside git returns transcripts", (state) => {
-    withTempDir((dir) => {
-      const planDir = join(dir, "run");
-      const repoRoot = join(dir, "repo");
-      mkdirSync(planDir);
-      mkdirSync(repoRoot);
-      if (state === "deleted") rmSync(repoRoot, { recursive: true });
-      expect(repoRootOf(planDir)).toBeNull();
-      const projectsRoot = join(dir, "projects");
-      jsonl(agentPath(projectsRoot, projectSlug(repoRoot), "a"), [
-        announceUser(planDir, "work/01", "dev"),
-        assistant("m", { input_tokens: 9 }),
-      ]);
-      expect(createTranscriptSource(planDir, projectsRoot, repoRoot).read()[0]!.counts.input).toBe(9);
-    });
-  });
+  test.each(["existing", "deleted"] as const)(
+    "explicit %s root outside git returns transcripts",
+    (state) => {
+      withTempDir((dir) => {
+        const planDir = join(dir, "run");
+        const repoRoot = join(dir, "repo");
+        mkdirSync(planDir);
+        mkdirSync(repoRoot);
+        if (state === "deleted") rmSync(repoRoot, { recursive: true });
+        expect(repoRootOf(planDir)).toBeNull();
+        const projectsRoot = join(dir, "projects");
+        jsonl(agentPath(projectsRoot, projectSlug(repoRoot), "a"), [
+          announceUser(planDir, "work/01", "dev"),
+          assistant("m", { input_tokens: 9 }),
+        ]);
+        expect(
+          createTranscriptSource(planDir, projectsRoot, repoRoot).read()[0]!
+            .counts.input,
+        ).toBe(9);
+      });
+    },
+  );
 
   test("explicit root caches the slug before its transcript directory appears", () => {
     withTempDir((dir) => {
@@ -317,10 +327,18 @@ describe("createTranscriptSource", () => {
         announceUser(planDir, "work/01", "dev"),
         assistant("m", { input_tokens: 11 }),
       ]);
-      const explicit = createTranscriptSource(planDir, projectsRoot, dir).read();
+      const explicit = createTranscriptSource(
+        planDir,
+        projectsRoot,
+        dir,
+      ).read();
       expect(explicit).toHaveLength(1);
-      expect(createTranscriptSource(planDir, projectsRoot).read()).toEqual(explicit);
-      expect(createTranscriptSource(planDir, projectsRoot, "").read()).toEqual(explicit);
+      expect(createTranscriptSource(planDir, projectsRoot).read()).toEqual(
+        explicit,
+      );
+      expect(createTranscriptSource(planDir, projectsRoot, "").read()).toEqual(
+        explicit,
+      );
     });
   });
 
@@ -334,27 +352,68 @@ describe("createTranscriptSource", () => {
         announceUser(planDir, "work/01", "dev"),
         assistant("m", { input_tokens: 11 }),
       ]);
-      const agents = createTranscriptSource(planDir, projectsRoot, undefined).read();
+      const agents = createTranscriptSource(
+        planDir,
+        projectsRoot,
+        undefined,
+      ).read();
       expect(agents).toHaveLength(1);
       expect(agents[0]!.counts.input).toBe(11);
+    });
+  });
+
+  test("a run id that is a prefix of an earlier one inherits none of its tokens", () => {
+    withTempDir((dir) => {
+      const projectsRoot = join(dir, "projects");
+      // Both are unique ids, and both satisfy the contract. Only the boundary rule
+      // keeps `retry-10`'s transcript out of `retry-1`'s totals.
+      for (const [id, input] of [
+        ["retry-10", 3],
+        ["retry-1", 7],
+      ] as const) {
+        const prompt = announceUser(dir, "work/01", "dev");
+        prompt.message.content += ` This run's identifier is ${id}.`;
+        jsonl(agentPath(projectsRoot, projectSlug(dir), id), [
+          prompt,
+          assistant("m", { input_tokens: input }),
+        ]);
+      }
+      const read = (runId: string) =>
+        createTranscriptSource(dir, projectsRoot, dir)
+          .read(runId)
+          .map((agent) => agent.counts.input);
+      expect(read("retry-1")).toEqual([7]);
+      expect(read("retry-10")).toEqual([3]);
     });
   });
 
   test("run identity changes invalidate included and excluded cached verdicts", () => {
     withTempDir((dir) => {
       const projectsRoot = join(dir, "projects");
-      for (const [id, input] of [["old-id", 3], ["new-id", 7]] as const) {
+      for (const [id, input] of [
+        ["old-id", 3],
+        ["new-id", 7],
+      ] as const) {
         const prompt = announceUser(dir, "work/01", "dev");
         prompt.message.content += id;
         jsonl(agentPath(projectsRoot, projectSlug(dir), id), [
-          prompt, assistant("m", { input_tokens: input }),
+          prompt,
+          assistant("m", { input_tokens: input }),
         ]);
       }
-      const source = createTranscriptSource(dir, projectsRoot, dir, "old-id");
-      expect(source.read().map((agent) => agent.counts.input)).toEqual([3]);
-      expect(source.read("new-id").map((agent) => agent.counts.input)).toEqual([7]);
-      expect(source.read("new-id").map((agent) => agent.counts.input)).toEqual([7]);
-      expect(source.read("old-id").map((agent) => agent.counts.input)).toEqual([3]);
+      const source = createTranscriptSource(dir, projectsRoot, dir);
+      expect(source.read("old-id").map((agent) => agent.counts.input)).toEqual([
+        3,
+      ]);
+      expect(source.read("new-id").map((agent) => agent.counts.input)).toEqual([
+        7,
+      ]);
+      expect(source.read("new-id").map((agent) => agent.counts.input)).toEqual([
+        7,
+      ]);
+      expect(source.read("old-id").map((agent) => agent.counts.input)).toEqual([
+        3,
+      ]);
     });
   });
 

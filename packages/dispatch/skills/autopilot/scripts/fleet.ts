@@ -1,4 +1,4 @@
-import { type GraphNode, unmetNodeDependencies } from "./graph-node";
+import { type GraphNode, unmetNodeDependencies } from "../../flightplan/scripts/lib/graph-node";
 import type {
   FlightlogEntry,
   ScoreEntry,

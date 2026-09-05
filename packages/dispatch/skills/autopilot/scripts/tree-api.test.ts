@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
-import type { GraphNode, NodeValidity } from "./graph-node";
+import type { GraphNode, NodeValidity } from "../../flightplan/scripts/lib/graph-node";
 import { buildTreePayload, type Loaded, repoName } from "./tree-api";
 
 const INVALID_COMPLETION: NodeValidity = {

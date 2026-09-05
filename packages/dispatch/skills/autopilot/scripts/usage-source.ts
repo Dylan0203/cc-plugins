@@ -55,8 +55,15 @@ export function parseAgentPrompt(content: unknown): {
   role: string | null;
   attempt: number | undefined;
 } {
-  const text = contentText(content);
+  return parseAgentPromptText(contentText(content));
+}
 
+/** The same parse over already-stringified content — the caller may hold the text. */
+function parseAgentPromptText(text: string): {
+  task: string | null;
+  role: string | null;
+  attempt: number | undefined;
+} {
   const announce = ANNOUNCE.exec(text);
   if (announce) {
     const attemptMatch = ATTEMPT.exec(text);
@@ -193,19 +200,52 @@ function discoverAgentFiles(slugDir: string): string[] {
 }
 
 /**
- * Whether `text` names a path at or under `planDir`. A bare `includes` is not enough:
- * `docs/foo` would claim every transcript of the sibling `docs/foo-bar` and absorb its
- * tokens, so the character after the match must end the path or separate the next segment.
+ * Whether `text` contains `needle` at a position `accept` approves, given the
+ * characters on either side (`undefined` at a string edge). A bare `includes` is
+ * never enough for either caller below: both would let a longer identifier claim
+ * a shorter one's transcripts and absorb its tokens.
  */
-function mentionsPlanDir(text: string, planDir: string): boolean {
+function containsDelimited(
+  text: string,
+  needle: string,
+  accept: (before: string | undefined, after: string | undefined) => boolean,
+): boolean {
   let from = 0;
   for (;;) {
-    const at = text.indexOf(planDir, from);
+    const at = text.indexOf(needle, from);
     if (at === -1) return false;
-    const next = text[at + planDir.length];
-    if (next === undefined || next === sep || next === "/") return true;
+    if (accept(text[at - 1], text[at + needle.length])) return true;
     from = at + 1;
   }
+}
+
+/**
+ * Whether `text` names a path at or under `planDir`: `docs/foo` would otherwise
+ * claim every transcript of the sibling `docs/foo-bar`, so the character after
+ * the match must end the path or separate the next segment.
+ */
+function mentionsPlanDir(text: string, planDir: string): boolean {
+  return containsDelimited(
+    text,
+    planDir,
+    (_before, after) => after === undefined || after === sep || after === "/",
+  );
+}
+
+// What can continue an identifier. A run id is opaque, so the boundary rule is
+// what separates `retry-1` from a previous run's `retry-10` — both are unique
+// ids, yet a substring test would hand the older run's tokens to the newer one.
+const ID_CHAR = /[A-Za-z0-9_-]/;
+
+/** Whether `text` carries this run's identifier, and not one it is a substring of. */
+function mentionsRunId(text: string, runId: string): boolean {
+  return containsDelimited(
+    text,
+    runId,
+    (before, after) =>
+      (before === undefined || !ID_CHAR.test(before)) &&
+      (after === undefined || !ID_CHAR.test(after)),
+  );
 }
 
 /**
@@ -224,20 +264,23 @@ function decideMembership(
       ? (record.message as Record<string, unknown>)
       : undefined;
   const content = message ? message.content : undefined;
+  // Stringified once: on a content-block array this is a full JSON.stringify of
+  // the agent's whole opening prompt, and all three checks below read it.
+  const text = contentText(content);
 
-  if (!mentionsPlanDir(contentText(content), planDir)) {
+  if (!mentionsPlanDir(text, planDir)) {
     state.membership = "excluded";
     return;
   }
 
   // Identity separates runs; an elapsed-time window includes immediate retries because spawn-to-announce gaps need slack and runs have no minimum interval.
-  if (runId && !contentText(content).includes(runId)) {
+  if (runId && !mentionsRunId(text, runId)) {
     state.membership = "excluded";
     return;
   }
 
   state.membership = "included";
-  const prompt = parseAgentPrompt(content);
+  const prompt = parseAgentPromptText(text);
   state.task = prompt.task;
   state.role = prompt.role;
   state.attempt = prompt.attempt;
@@ -305,7 +348,8 @@ function collectExternalMarks(state: FileState, line: string): void {
   if (line.includes("/relay/")) {
     state.externalDriver = true;
     RELAY_DIR.lastIndex = 0;
-    for (const match of line.matchAll(RELAY_DIR)) state.relayDirs.add(match[1]!);
+    for (const match of line.matchAll(RELAY_DIR))
+      state.relayDirs.add(match[1]!);
   }
   if (!state.externalDriver && ENGINE_WRAPPER.test(line)) {
     state.externalDriver = true;
@@ -412,11 +456,12 @@ export function createTranscriptSource(
   planDir: string,
   projectsRoot?: string,
   repoRoot?: string,
-  runId?: string,
 ): TranscriptSource {
   const root = projectsRoot ?? join(homedir(), ".claude", "projects");
   const files = new Map<string, FileState>();
-  let cachedRunId = runId;
+  // Run identity arrives per `read()`: it is re-read from run.id on every snapshot,
+  // so binding it at construction would only ever hold a stale copy.
+  let cachedRunId: string | undefined;
   // Even when the directory does not exist yet (explicit root, pre-run), the cache succeeds.
   // The walk "never located" (null root, cache never populated) is a different failure mode from
   // "located but unattributed" (directory found but no transcripts carry this run's id).
@@ -434,7 +479,7 @@ export function createTranscriptSource(
   }
 
   return {
-    read(currentRunId = runId): AgentUsage[] {
+    read(currentRunId?: string): AgentUsage[] {
       // Membership verdicts and their derived usage are keyed by run identity as well as file path.
       if (currentRunId !== cachedRunId) {
         files.clear();
