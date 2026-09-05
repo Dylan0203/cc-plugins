@@ -3,40 +3,39 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
-import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
+import type { GraphNode, NodeValidity } from "./graph-node";
 import { buildTreePayload, type Loaded, repoName } from "./tree-api";
 
-/** A body whose Verification gate box is still unticked. */
-const UNTICKED_GATE = "## Verification\n\n- [ ] Run the suite\n";
+const INVALID_COMPLETION: NodeValidity = {
+  kind: "invalid",
+  rule: "completion-state",
+  reason: "Status is done but a gate checkbox is still unticked. Do NOT tick the boxes by hand",
+};
 
 function task(
   ref: string,
-  status: ParsedTask["status"] = "todo",
+  status: GraphNode["status"] = "todo",
   dependsOn: string[] = [],
-  body = "",
-): ParsedTask {
+  validity: NodeValidity = status === "done"
+    ? { kind: "complete" }
+    : { kind: "unfinished", status },
+): GraphNode {
   const [bucket, nn] = ref.split("/");
   return {
+    ref,
     bucket,
     nn,
     title: `Task ${ref}`,
-    h1: `# ${bucket.toUpperCase()}-${nn}: Task ${ref}`,
-    requiredReading: [],
-    dependsOn: dependsOn.map((dependency) => {
-      const [dependencyBucket, dependencyNn] = dependency.split("/");
-      return { bucket: dependencyBucket, nn: dependencyNn };
-    }),
+    dependsOn,
     blocks: [],
     status,
     finalReview: false,
-    sections: [],
-    body,
-    rubric: null,
+    validity,
   };
 }
 
 function input(
-  byRef: Record<string, ParsedTask> = {},
+  byRef: Record<string, GraphNode> = {},
   bucketDirs: string[] = [],
   entries: FlightlogEntry[] = [],
   errors: Loaded["errors"] = [],
@@ -218,7 +217,7 @@ describe("buildTreePayload", () => {
     const payload = buildTreePayload(
       input(
         {
-          "api/01": task("api/01", "done", [], UNTICKED_GATE),
+          "api/01": task("api/01", "done", [], INVALID_COMPLETION),
           "api/02": task("api/02", "todo", ["api/01"]),
         },
         ["api"],
