@@ -6,7 +6,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: contract/03, deck/04, skill/02
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -159,33 +159,33 @@ one outcome this gate must never produce.
 
 ## Acceptance criteria
 
-- [ ] The authoring documentation was followed literally, end to end, without
+- [x] The authoring documentation was followed literally, end to end, without
       opening a source file, and reached a rendering dashboard.
-- [ ] A field-by-field comparison of the specification, the authoring guidance,
+- [x] A field-by-field comparison of the specification, the authoring guidance,
       and the loader's validation is written down, and every disagreement found
       is fixed.
-- [ ] Exactly one implementation decides a node's displayed state; any second
+- [x] Exactly one implementation decides a node's displayed state; any second
       one found has been removed.
-- [ ] The diff of every pre-existing test file was read, and no assertion was
+- [x] The diff of every pre-existing test file was read, and no assertion was
       deleted or loosened.
-- [ ] A named test proves that a run directory inside a repository still
+- [x] A named test proves that a run directory inside a repository still
       locates its transcripts through the original walk.
-- [ ] The whole diff was read in one pass for leanness, and every remaining
+- [x] The whole diff was read in one pass for leanness, and every remaining
       abstraction has a named current requirement.
-- [ ] The full test suite passes.
-- [ ] The typecheck prints nothing for the paths this plan touched.
-- [ ] Every finding is either fixed or recorded in the known-gaps list.
+- [x] The full test suite passes.
+- [x] The typecheck prints nothing for the paths this plan touched.
+- [x] Every finding is either fixed or recorded in the known-gaps list.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/` passes.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes.
-- [ ] `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/`
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/` passes.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes.
+- [x] `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/`
       passes.
-- [ ] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. The
+- [x] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. The
       repo-wide run is **not** green — 86 pre-existing errors sit outside this
       plan's scope — so a clean result is an empty grep, never a zero count.
-- [ ] Start the dashboard against the shipped example's run directory with
+- [x] Start the dashboard against the shipped example's run directory with
       `bun packages/dispatch/skills/autopilot/scripts/flightdeck.ts --plan <example-run-dir>`
       and confirm every panel renders: the lane list, the dependency graph, the
       fleet table, and the counts.

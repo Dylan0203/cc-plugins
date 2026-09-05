@@ -140,3 +140,52 @@ contract/01
 
 - **A `dispatch` version bump is not part of this plan.** It belongs to a
   separate release flow once this ships.
+
+### Recorded by the final review (review/01)
+
+Two gaps above are now stale in one direction. The out-of-repo transcript walk
+has its fix — `repoRoot` comes from `graph.json` and is unit-tested — and the
+per-run identifier is implemented and unit-tested. Neither was re-measured
+against a live run, because executing one is out of scope for this plan. Read
+both as "implemented, not field-proven".
+
+Findings this review examined and deliberately did not apply:
+
+- **`NodeValidity` stays looser than `TaskValidity`.** `graph-node.ts` declares
+  `status: string | null` and `rule: string` where `parse-task.ts` has
+  `Exclude<TaskStatus, "done">` and `"status" | "completion-state"`. Left as is:
+  no consumer reads either field as a discriminant — `deriveTaskViews` reads only
+  `kind` and `reason` — so the looser fields cost nothing today, while tightening
+  them forces edits to three existing assertions, one of which deliberately proves
+  an arbitrary status string is inert.
+
+- **`detectSource` keeps its `try`/`catch` instead of `statSync(..., {
+  throwIfNoEntry: false })`.** The stdlib option was applied and reverted: it
+  suppresses only `ENOENT`, so a `--plan` pointing at a plain file threw
+  `ENOTDIR` and lost the launcher's validation message. A pre-existing test
+  caught it. The `catch` is load-bearing, not a hand-rolled stdlib duplicate.
+
+- **`graph.js` keeps its `options.lanes?.length && Array.isArray(nodes)`
+  ternary.** Simplifying it to `orderedNodes` was applied and reverted: the
+  `appends undeclared buckets in input order` test pins that iteration order for
+  a payload that declares lanes and still carries an undeclared bucket. Unused by
+  the graph loader, but covered behaviour on the task-tree path.
+
+- **`buildStateEntry` stays.** It is an identity mapping with one caller, but it
+  keeps the CLI's `log` and `state` branches symmetric with `buildNoteEntry`
+  beside it, and removing it would delete a passing test for no behaviour change.
+
+- **`roleFromEntry`'s `entry.kind === "state"` guard stays.** `aggregateFleet`
+  returns on state entries before reaching it, but the guard is the narrowing
+  that lets `entry.role` type-check; removing it needs a new parameter type, so
+  it is not a net reduction.
+
+- **`SKILL.md`'s nine short-form rules stay.** They restate `authoring.md`
+  §1–9, but `SKILL.md` is the always-loaded surface and the reference is opt-in;
+  collapsing them to a pointer makes the skill's behaviour depend on the model
+  choosing to open a file.
+
+- **The formatter reflowed whole files.** The repo's `PostToolUse` hook
+  reformats each edited file, so `graph-source.ts`, `graph-source.test.ts`, and
+  several others show far larger diffs than this review's changes. Read those
+  diffs with `git diff -w`.
