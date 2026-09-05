@@ -1,7 +1,7 @@
 {
   "name": "dispatch",
   "version": "3.25.3",
-  "description": "Plan before you fly — interview-driven specs you can execute. preflight gathers requirements into a single in-conversation plan; flightplan writes a multi-file blueprint to disk; autopilot flies the tree with a dev→verify→judge→score quality loop; waypoints orchestrates the rolling-wave roadmap tier above flightplan.",
+  "description": "Plan before you fly — interview-driven specs you can execute. preflight gathers requirements into a single in-conversation plan; flightplan writes a multi-file blueprint to disk; autopilot flies the tree with a dev→verify→judge→score quality loop; waypoints orchestrates the rolling-wave roadmap tier above flightplan; deckplan is a reference-only guide to authoring Workflow scripts for flightdeck.",
   "author": {
     "name": "Q"
   },
@@ -11,6 +11,9 @@
     "flightplan",
     "autopilot",
     "waypoints",
+    "deckplan",
+    "workflow",
+    "flightdeck",
     "interview",
     "spec",
     "blueprint",
@@ -23,7 +26,7 @@
   "interface": {
     "displayName": "Dispatch",
     "shortDescription": "Interview-driven planning: lightweight in-conversation specs and multi-file blueprints for sub-agents.",
-    "longDescription": "Four skills in one plugin. preflight is a lightweight interviewer that gathers requirements through systematic questioning and writes a single in-conversation plan to approve and execute. flightplan is the heavyweight sibling: it interviews thoroughly, then commits a complete blueprint to disk — PLAN.md plus a tasks/ tree with shared _context/ files and self-contained task files a different session or sub-agent can pick up and execute independently. autopilot executes that tree: for each ready task it runs a dev→verify→judge→score loop that gates on the task's own Eval rubric, retrying until it passes, then runs the closing final-review task as the whole-tree gate — leaving an audit trail of every verdict. waypoints orchestrates the rolling-wave milestone-roadmap tier above flightplan.",
+    "longDescription": "Five skills in one plugin. preflight is a lightweight interviewer that gathers requirements through systematic questioning and writes a single in-conversation plan to approve and execute. flightplan is the heavyweight sibling: it interviews thoroughly, then commits a complete blueprint to disk — PLAN.md plus a tasks/ tree with shared _context/ files and self-contained task files a different session or sub-agent can pick up and execute independently. autopilot executes that tree: for each ready task it runs a dev→verify→judge→score loop that gates on the task's own Eval rubric, retrying until it passes, then runs the closing final-review task as the whole-tree gate — leaving an audit trail of every verdict. waypoints orchestrates the rolling-wave milestone-roadmap tier above flightplan. deckplan explains how to author Workflow scripts for flightdeck; it runs no interview, scaffolds nothing, generates no artifacts, and bundles no scripts.",
     "developerName": "Q",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
@@ -32,7 +35,8 @@
       "Help me think through this idea.",
       "Fully spec this out and break it into task files.",
       "Draft a PLAN.md and tasks for sub-agents.",
-      "Execute the flightplan in docs/<slug> with autopilot."
+      "Execute the flightplan in docs/<slug> with autopilot.",
+      "Explain how to author a Workflow script I can watch on flightdeck."
     ],
     "brandColor": "#35CAD2"
   }

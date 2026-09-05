@@ -7,7 +7,7 @@
 >
 > **Depends on**: contract/02, contract/03
 > **Blocks**: deck/02, deck/03, deck/04
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -159,38 +159,38 @@ still appears in the returned array.
 
 ## Acceptance criteria
 
-- [ ] `parseGraph` is pure: it takes text and a file label, returns
+- [x] `parseGraph` is pure: it takes text and a file label, returns
       `ParsedGraph`, and touches no filesystem.
-- [ ] Every validation rule listed above returns a named error whose `reason`
+- [x] Every validation rule listed above returns a named error whose `reason`
       identifies the offending value, and none of them throws.
-- [ ] A file failing any validation rule returns an empty `nodes` map together
+- [x] A file failing any validation rule returns an empty `nodes` map together
       with its errors.
-- [ ] A dangling `dependsOn` ref is removed from the node's `dependsOn` array
+- [x] A dangling `dependsOn` ref is removed from the node's `dependsOn` array
       and reported as an error, and the node it belonged to is not left blocked
       by it.
-- [ ] A field of the wrong type produces an error rather than being coerced,
+- [x] A field of the wrong type produces an error rather than being coerced,
       including a non-string top-level title.
-- [ ] An absent top-level title falls back to the supplied fallback, asserted on
+- [x] An absent top-level title falls back to the supplied fallback, asserted on
       the pure parser directly, and the reader supplies the run directory's base
       name as that fallback.
-- [ ] Field mapping is exactly as specified, including `nn` derived from the ref
+- [x] Field mapping is exactly as specified, including `nn` derived from the ref
       and both `status` and `validity` reflecting that no state is declared yet.
-- [ ] The returned `lanes` array preserves the file's order and includes a lane
+- [x] The returned `lanes` array preserves the file's order and includes a lane
       that names no node.
-- [ ] `loadGraph` returns an error for a missing or unreadable file rather than
+- [x] `loadGraph` returns an error for a missing or unreadable file rather than
       rejecting or throwing.
-- [ ] A valid file loads every node, keyed by ref.
+- [x] A valid file loads every node, keyed by ref.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/graph-source.test.ts`
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/graph-source.test.ts`
       passes.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes — the
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes — the
       existing suite is unchanged by this work.
-- [ ] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. The
+- [x] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. The
       repo-wide typecheck is not green (86 pre-existing errors sit elsewhere),
       so a zero count is not the bar — an empty grep on these paths is.
-- [ ] Tests for the pure parser use in-memory fixture strings; tests for
+- [x] Tests for the pure parser use in-memory fixture strings; tests for
       `loadGraph` use a real temp directory created and removed by a local
       helper, not a mock.
 

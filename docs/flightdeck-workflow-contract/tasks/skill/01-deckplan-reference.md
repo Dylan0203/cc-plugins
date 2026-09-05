@@ -7,7 +7,7 @@
 >
 > **Depends on**: contract/03
 > **Blocks**: skill/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -108,24 +108,24 @@ This repo's reference documents are prose-first: one instruction per sentence, t
 
 ## Acceptance criteria
 
-- [ ] `packages/dispatch/skills/deckplan/SKILL.md` and `packages/dispatch/skills/deckplan/references/authoring.md` both exist.
-- [ ] The skill states in its frontmatter and its opening paragraph that it is reference-only — no interview, no generation, no bundled scripts.
-- [ ] All nine authoring rules are present, and each one names the concrete failure it prevents.
-- [ ] A conformance checklist closes the authoring reference, at ten items or fewer.
-- [ ] Frontmatter carries `name`, `version`, `description`, and a `when_to_use` that includes an explicit do-NOT-trigger clause covering both the task-tree execution skill's territory and a passing mention of a workflow.
-- [ ] Neither manifest gains a `skills` key; both have their `description` and `keywords` updated, and the codex manifest's `interface` prose no longer states a stale skill count.
-- [ ] Neither new file reproduces the graph file's JSON shape, the entry TypeScript types, the validation list, or the numbered state-resolution order — each is referenced by pointing at `packages/dispatch/skills/autopilot/references/graph-contract.md`.
-- [ ] Every shell command shape in the authoring reference is character-identical to the one in that specification document.
+- [x] `packages/dispatch/skills/deckplan/SKILL.md` and `packages/dispatch/skills/deckplan/references/authoring.md` both exist.
+- [x] The skill states in its frontmatter and its opening paragraph that it is reference-only — no interview, no generation, no bundled scripts.
+- [x] All nine authoring rules are present, and each one names the concrete failure it prevents.
+- [x] A conformance checklist closes the authoring reference, at ten items or fewer.
+- [x] Frontmatter carries `name`, `version`, `description`, and a `when_to_use` that includes an explicit do-NOT-trigger clause covering both the task-tree execution skill's territory and a passing mention of a workflow.
+- [x] Neither manifest gains a `skills` key; both have their `description` and `keywords` updated, and the codex manifest's `interface` prose no longer states a stale skill count.
+- [x] Neither new file reproduces the graph file's JSON shape, the entry TypeScript types, the validation list, or the numbered state-resolution order — each is referenced by pointing at `packages/dispatch/skills/autopilot/references/graph-contract.md`.
+- [x] Every shell command shape in the authoring reference is character-identical to the one in that specification document.
 
 ## Verification
 
-- [ ] Run `ls packages/dispatch/skills/deckplan/SKILL.md packages/dispatch/skills/deckplan/references/authoring.md` and confirm both paths print.
-- [ ] Run `head -20 packages/dispatch/skills/deckplan/SKILL.md` and confirm the frontmatter block parses as YAML by eye and carries `name`, `version`, `description`, and `when_to_use`.
-- [ ] Run `grep -nE 'ScoreEntry|NoteEntry|StateEntry|"version": 1|"lanes"|"repoRoot"' packages/dispatch/skills/deckplan/SKILL.md packages/dispatch/skills/deckplan/references/authoring.md` and confirm every hit is a prose mention or a pointer, and that no hit is a type or JSON definition.
-- [ ] Run `grep -c 'flightlog.ts' packages/dispatch/skills/deckplan/references/authoring.md` and confirm the command shapes are present, then diff each one by eye against `packages/dispatch/skills/autopilot/references/graph-contract.md` and confirm they match character for character.
-- [ ] Run `grep -n 'graph-contract.md' packages/dispatch/skills/deckplan/SKILL.md packages/dispatch/skills/deckplan/references/authoring.md` and confirm the specification is pointed at from both files.
-- [ ] Run `bunx --bun tsc --noEmit | grep packages/dispatch` and confirm it prints nothing. This task adds no TypeScript, so any output means a manifest edit broke something. The repo-wide typecheck is not green — 86 pre-existing errors sit elsewhere — so a zero total is not the bar.
-- [ ] Run `node -e 'JSON.parse(require("fs").readFileSync("packages/dispatch/.claude-plugin/plugin.json","utf8"));JSON.parse(require("fs").readFileSync("packages/dispatch/.codex-plugin/plugin.json","utf8"));console.log("ok")'` and confirm it prints `ok`, so neither manifest was left as invalid JSON.
+- [x] Run `ls packages/dispatch/skills/deckplan/SKILL.md packages/dispatch/skills/deckplan/references/authoring.md` and confirm both paths print.
+- [x] Run `head -20 packages/dispatch/skills/deckplan/SKILL.md` and confirm the frontmatter block parses as YAML by eye and carries `name`, `version`, `description`, and `when_to_use`.
+- [x] Run `grep -nE 'ScoreEntry|NoteEntry|StateEntry|"version": 1|"lanes"|"repoRoot"' packages/dispatch/skills/deckplan/SKILL.md packages/dispatch/skills/deckplan/references/authoring.md` and confirm every hit is a prose mention or a pointer, and that no hit is a type or JSON definition.
+- [x] Run `grep -c 'flightlog.ts' packages/dispatch/skills/deckplan/references/authoring.md` and confirm the command shapes are present, then diff each one by eye against `packages/dispatch/skills/autopilot/references/graph-contract.md` and confirm they match character for character.
+- [x] Run `grep -n 'graph-contract.md' packages/dispatch/skills/deckplan/SKILL.md packages/dispatch/skills/deckplan/references/authoring.md` and confirm the specification is pointed at from both files.
+- [x] Run `bunx --bun tsc --noEmit | grep packages/dispatch` and confirm it prints nothing. This task adds no TypeScript, so any output means a manifest edit broke something. The repo-wide typecheck is not green — 86 pre-existing errors sit elsewhere — so a zero total is not the bar.
+- [x] Run `node -e 'JSON.parse(require("fs").readFileSync("packages/dispatch/.claude-plugin/plugin.json","utf8"));JSON.parse(require("fs").readFileSync("packages/dispatch/.codex-plugin/plugin.json","utf8"));console.log("ok")'` and confirm it prints `ok`, so neither manifest was left as invalid JSON.
 
 ## Eval rubric
 
