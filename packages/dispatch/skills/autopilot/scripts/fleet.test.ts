@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
+import type { GraphNode, NodeValidity } from "./graph-node";
 import type {
   FlightlogEntry,
   ScoreEntry,
@@ -46,32 +46,31 @@ const score = (task: string, attempt: number, ts: string): ScoreEntry => ({
   breakdown: [{ name: "Correctness", weight: 2, score: 5 }],
 });
 
-/** A body whose Verification gate box is still unticked. */
-const UNTICKED_GATE = "## Verification\n\n- [ ] Run the suite\n";
+const INVALID_COMPLETION: NodeValidity = {
+  kind: "invalid",
+  rule: "completion-state",
+  reason: "Status is done but a gate checkbox is still unticked. Do NOT tick the boxes by hand",
+};
 
 const task = (
   ref: string,
-  status: ParsedTask["status"] = "todo",
+  status: GraphNode["status"] = "todo",
   dependsOn: string[] = [],
-  body = "",
-): ParsedTask => {
+  validity: NodeValidity = status === "done"
+    ? { kind: "complete" }
+    : { kind: "unfinished", status },
+): GraphNode => {
   const [bucket, nn] = ref.split("/");
   return {
+    ref,
     bucket,
     nn,
     title: ref,
-    h1: `# ${bucket.toUpperCase()}-${nn}: ${ref}`,
-    requiredReading: [],
-    dependsOn: dependsOn.map((dependency) => {
-      const [dependencyBucket, dependencyNn] = dependency.split("/");
-      return { bucket: dependencyBucket, nn: dependencyNn };
-    }),
-    blocks: [{ bucket: "next", nn: "01" }],
+    dependsOn,
+    blocks: ["next/01"],
     status,
     finalReview: false,
-    sections: [],
-    body,
-    rubric: null,
+    validity,
   };
 };
 
@@ -160,7 +159,7 @@ describe("deriveTaskViews", () => {
 
   test("malformed completion reads as invalid, never as done", () => {
     const views = deriveTaskViews(
-      { "a/01": task("a/01", "done", [], UNTICKED_GATE) },
+      { "a/01": task("a/01", "done", [], INVALID_COMPLETION) },
       [],
     );
     expect(views[0].state).toBe("invalid");
@@ -171,7 +170,7 @@ describe("deriveTaskViews", () => {
   test("a dependent of an invalid task stays blocked by that ref", () => {
     const views = deriveTaskViews(
       {
-        "a/01": task("a/01", "done", [], UNTICKED_GATE),
+        "a/01": task("a/01", "done", [], INVALID_COMPLETION),
         "a/02": task("a/02", "todo", ["a/01"]),
       },
       [],
