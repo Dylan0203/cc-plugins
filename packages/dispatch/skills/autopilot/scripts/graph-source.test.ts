@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { type FlightlogEntry, type StateEntry, parseLog } from "../../flightplan/scripts/lib/flightlog";
-import { deriveTaskViews } from "./fleet";
+import { aggregateFleet, deriveTaskViews } from "./fleet";
 import { buildTreePayload } from "./tree-api";
 import { type GraphNode, unmetNodeDependencies } from "./graph-node";
 import { applyStateEntries, loadGraph, parseGraph } from "./graph-source";
@@ -302,5 +302,88 @@ describe("applyStateEntries", () => {
       deriveTaskViews({ [original.ref]: original }, entries.slice(0, 1)),
     );
     expect(deriveTaskViews({ [original.ref]: original }, entries)[0].state).toBe("in-progress");
+  });
+});
+
+
+describe("committed deckplan example", () => {
+  const exampleDir = join(import.meta.dir, "../../deckplan/references/example");
+
+  test("loads the template directly and renders every node, counter, retry and score", async () => {
+    const graph = await loadGraph(exampleDir);
+    const trail = await readFile(join(exampleDir, "run.jsonl"), "utf-8");
+    const entries = parseLog(trail);
+    expect(entries).toHaveLength(trail.trim().split("\n").length);
+    expect(graph.errors).toEqual([]);
+    expect(Object.keys(graph.nodes)).toHaveLength(5);
+    expect(graph.lanes).toEqual(["scout", "build", "audit"]);
+    const mapped = applyStateEntries(graph.nodes, entries);
+    expect(mapped.errors).toEqual([]);
+    const views = deriveTaskViews(mapped.nodes, entries);
+    expect(Object.fromEntries(views.map(({ ref, title, state }) => [ref, { title, state }]))).toEqual({
+      "scout/01": { title: "Inventory repository", state: "done" },
+      "scout/02": { title: "Survey documentation", state: "ready" },
+      "build/01": { title: "Draft repository guide", state: "in-progress" },
+      "build/02": { title: "Review repository guide", state: "blocked" },
+      "audit/01": { title: "Check license evidence", state: "invalid" },
+    });
+    expect(views.find(({ ref }) => ref === "build/01")?.dependsOn).toEqual(["scout/01"]);
+    expect(views.find(({ ref }) => ref === "build/02")?.blockedBy).toEqual(["build/01"]);
+    expect(views.find(({ ref }) => ref === "scout/01")?.attempts).toBe(2);
+    expect(entries.filter(({ task }) => task === "scout/02")).toEqual([]);
+    expect(entries.filter((entry) => entry.kind === "state" && entry.state === "blocked")).toEqual([]);
+    const payload = buildTreePayload({ deckSource: "graph", slug: "repository-tour",
+      planTitle: graph.title, repo: graph.repoRoot, bucketDirs: graph.lanes,
+      loaded: { byRef: mapped.nodes, errors: mapped.errors }, entries });
+    expect(payload.buckets).toEqual(graph.lanes);
+    expect(payload.counts).toEqual({ total: 5, done: 1, inProgress: 1, ready: 1, blocked: 1, invalid: 1 });
+    const fleet = aggregateFleet(entries);
+    expect(fleet).toHaveLength(5);
+    expect(fleet.filter(({ role, ref }) => role === "dev" && ref === "scout/01")
+      .map(({ attempt, status }) => ({ attempt, status })).sort((a, b) => a.attempt! - b.attempt!))
+      .toEqual([{ attempt: 1, status: "finished" }, { attempt: 2, status: "finished" }]);
+    const score = { weighted: 4.5, threshold: 4, passOp: ">=" as const, passed: true, hardFailed: false,
+      breakdown: [{ name: "accuracy", weight: 1, score: 5 }, { name: "coverage", weight: 1, score: 4 }] };
+    expect(views.find(({ ref }) => ref === "scout/01")?.latestScore).toEqual(score);
+    expect(fleet.find(({ role }) => role === "judge")).toMatchObject({
+      ref: "scout/01", attempt: 2, status: "finished", outcome: "passed", score,
+    });
+    expect(fleet.find(({ ref }) => ref === "build/01")?.status).toBe("in-flight");
+    expect(entries.map(({ ts }) => ts)).toEqual(entries.map(({ ts }) => ts).sort());
+  });
+
+  test("every initial prompt embeds the shipped identity and absolute lifecycle paths", async () => {
+    const runId = (await readFile(join(exampleDir, "run.id"), "utf-8")).trim();
+    const script = await readFile(join(exampleDir, "workflow.js"), "utf-8");
+    const graph = await loadGraph(exampleDir);
+    const literals = Object.fromEntries([...script.matchAll(/^  (\w+): "([^"\n]+)",$/gm)]
+      .map(([, key, value]) => [key, value]));
+    expect(literals.runId).toBe(runId);
+    expect(literals.repoRoot).toBe(graph.repoRoot);
+    for (const key of ["runDir", "flightlog", "repoRoot"]) expect(literals[key]).toMatch(/^\//);
+    // Inspect templates without executing the reference workflow or spawning agents.
+    const prompts = [...script.matchAll(/agent\(`([\s\S]*?)`,/g)].map(([, template]) =>
+      template!.replace(/\$\{CFG\.(\w+)\}/g, (_, key) => literals[key]!));
+    expect(prompts).toHaveLength(5);
+    const refs = [];
+    for (const prompt of prompts) {
+      expect(prompt).toContain(runId);
+      expect(prompt).toContain(literals.runDir!);
+      expect(prompt).toContain(literals.repoRoot!);
+      expect(prompt).not.toMatch(/\$|~\//);
+      const lines = prompt.trim().split("\n");
+      const start = lines[0]!;
+      const end = lines.at(-1)!;
+      const identity = /--task ([a-z][a-z0-9-]*\/\d{2}) --role (\w+) --attempt (\d+) --agent "([^"]+)"/;
+      expect(start).toContain(`bun "${literals.flightlog}" log "${literals.runDir}/.flightlog/run.jsonl"`);
+      expect(start).toContain("--phase start");
+      expect(end).toContain("--phase end --message");
+      expect(start.match(identity)?.slice(1)).toEqual(end.match(identity)?.slice(1));
+      const ref = start.match(identity)![1]!;
+      refs.push(ref);
+      expect(prompt).toContain(`state "${literals.runDir}/.flightlog/run.jsonl" --task ${ref} --state done`);
+    }
+    expect(refs.sort()).toEqual(Object.keys(graph.nodes).sort());
+    expect(script).not.toMatch(/\bimport\b|\brequire\s*\(|\b(?:Bun|process|Deno)\./);
   });
 });
