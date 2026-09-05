@@ -1,9 +1,4 @@
-import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
-import {
-  refToString,
-  taskValidity,
-} from "../../flightplan/scripts/lib/parse-task";
-import { unmetDependencies } from "../../flightplan/scripts/next-ready";
+import { type GraphNode, unmetNodeDependencies } from "./graph-node";
 import type {
   FlightlogEntry,
   ScoreEntry,
@@ -229,19 +224,17 @@ function hasOpenStart(aggregate: TaskAggregate | undefined): boolean {
 }
 
 export function deriveTaskViews(
-  byRef: Record<string, ParsedTask>,
+  byRef: Record<string, GraphNode>,
   entries: FlightlogEntry[],
 ): TaskView[] {
   const byTask = aggregateByTask(entries);
 
   return Object.entries(byRef).map(([ref, task]) => {
     const aggregate = byTask.get(ref);
-    const dependsOn = task.dependsOn.map(refToString);
-    const blocks = task.blocks.map(refToString);
-    // The readiness rule lives in next-ready.ts alone, so the dashboard and the
-    // scout can never disagree about which task is blocked.
-    const blockedBy = unmetDependencies(task, byRef);
-    const validity = taskValidity(task);
+    const dependsOn = task.dependsOn;
+    const blocks = task.blocks;
+    const blockedBy = unmetNodeDependencies(task, byRef);
+    const validity = task.validity;
     let state: TaskState;
     // Validity outranks the raw Status: a task claiming `done` over an unticked
     // gate box must read as invalid, never as done, or the dashboard would show
