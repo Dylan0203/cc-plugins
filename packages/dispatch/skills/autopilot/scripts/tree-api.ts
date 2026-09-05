@@ -3,13 +3,13 @@ import { basename, dirname, join } from "node:path";
 import { loadAllTasks } from "../../flightplan/scripts/next-ready";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import { readLog, runLogPath } from "../../flightplan/scripts/lib/flightlog";
-import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
+import { type GraphNode, nodesFromParsedTasks } from "./graph-node";
 import { deriveTaskViews, type TaskState, type TaskView } from "./fleet";
 import { repoRootOf } from "./usage-source";
 import { summarizeWaves, type WaveSummary } from "./waves";
 
 export type Loaded = {
-  byRef: Record<string, ParsedTask>;
+  byRef: Record<string, GraphNode>;
   errors: { file: string; bucket: string; reason: string }[];
 };
 
@@ -84,7 +84,7 @@ export async function loadPlan(planDir: string): Promise<{
     // The loader already applied the bucket rule; re-listing here would state it twice.
     bucketDirs: taskResult.buckets,
     loaded: {
-      byRef: taskResult.byRef,
+      byRef: nodesFromParsedTasks(taskResult.byRef),
       errors: taskResult.errors.map((error) => ({
         ...error,
         bucket: basename(dirname(error.file)),
