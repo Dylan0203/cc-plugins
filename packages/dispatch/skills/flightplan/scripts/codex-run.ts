@@ -54,7 +54,7 @@ function run(mode: Mode, prompt: string, lastFile: string): number {
     return 2;
   }
 
-  let proc: ReturnType<typeof Bun.spawnSync>;
+  let proc: Bun.SyncSubprocess<"pipe", "pipe">;
   try {
     proc = Bun.spawnSync(
       [CODEX_BIN, "exec", ...MODE_ARGS[mode], "-o", lastFile, "-"],

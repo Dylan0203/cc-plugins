@@ -95,7 +95,7 @@ function run(mode: Mode, prompt: string, model: string): number {
 
   const message = mode === "review" ? REVIEW_GUARD + prompt : prompt;
 
-  let proc: ReturnType<typeof Bun.spawnSync>;
+  let proc: Bun.SyncSubprocess<"pipe", "pipe">;
   try {
     proc = Bun.spawnSync(
       [OPENCODE_BIN, "run", "-m", model, "--format", "json", message],
