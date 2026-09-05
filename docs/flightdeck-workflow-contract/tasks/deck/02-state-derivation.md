@@ -7,7 +7,7 @@
 >
 > **Depends on**: contract/01, deck/01
 > **Blocks**: deck/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -208,22 +208,22 @@ cannot slip through unasserted.
 
 ## Acceptance criteria
 
-- [ ] `applyStateEntries` is exported, pure, and mutates neither argument.
-- [ ] `done`, `blocked`, and `failed` each map to the `status` and `validity` in the mapping table.
-- [ ] The latest entry by trail position wins, including when two entries share a `ts`.
-- [ ] An unknown state value marks the node invalid and reports an error.
-- [ ] An entry naming an unknown node reports an error and changes no node, and
+- [x] `applyStateEntries` is exported, pure, and mutates neither argument.
+- [x] `done`, `blocked`, and `failed` each map to the `status` and `validity` in the mapping table.
+- [x] The latest entry by trail position wins, including when two entries share a `ts`.
+- [x] An unknown state value marks the node invalid and reports an error.
+- [x] An entry naming an unknown node reports an error and changes no node, and
       this holds for all three entry kinds, not only state entries.
-- [ ] Several entries sharing one unknown ref produce one error, not one each.
-- [ ] A node with no state entry is returned unchanged apart from the `status` normalisation the recorded decision calls for.
-- [ ] State entries do not decrement the open-start count, and a node with an unclosed `start` note and no state entry reads `in-progress`.
-- [ ] A small graph plus a small trail produces all five displayed states — `done`, `in-progress`, `ready`, `blocked`, `invalid` — through the existing derivation.
+- [x] Several entries sharing one unknown ref produce one error, not one each.
+- [x] A node with no state entry is returned unchanged apart from the `status` normalisation the recorded decision calls for.
+- [x] State entries do not decrement the open-start count, and a node with an unclosed `start` note and no state entry reads `in-progress`.
+- [x] A small graph plus a small trail produces all five displayed states — `done`, `in-progress`, `ready`, `blocked`, `invalid` — through the existing derivation.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/graph-source.test.ts` passes.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes — the whole autopilot suite, proving the task-file path is unmoved.
-- [ ] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. Run it against the root `tsconfig.json`, never a file list. The repo-wide run is **not** green — 86 pre-existing errors sit elsewhere — so a clean result is an empty grep, not a zero count.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/graph-source.test.ts` passes.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes — the whole autopilot suite, proving the task-file path is unmoved.
+- [x] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. Run it against the root `tsconfig.json`, never a file list. The repo-wide run is **not** green — 86 pre-existing errors sit elsewhere — so a clean result is an empty grep, not a zero count.
 
 ## Eval rubric
 
