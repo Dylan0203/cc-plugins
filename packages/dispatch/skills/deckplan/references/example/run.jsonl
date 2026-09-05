@@ -1,0 +1,13 @@
+{"kind":"note","ts":"2026-09-06T06:00:00.000Z","task":"scout/01","role":"dev","attempt":1,"agentLabel":"dev:scout/01#1","phase":"start","message":"Inspect repository inventory."}
+{"kind":"note","ts":"2026-09-06T06:01:00.000Z","task":"scout/01","role":"dev","attempt":1,"agentLabel":"dev:scout/01#1","phase":"end","message":"Missed the nested source directory; retry required."}
+{"kind":"state","ts":"2026-09-06T06:02:00.000Z","task":"scout/01","state":"failed","message":"Inventory omitted nested sources."}
+{"kind":"note","ts":"2026-09-06T06:03:00.000Z","task":"scout/01","role":"dev","attempt":2,"agentLabel":"dev:scout/01#2","phase":"start","message":"Include nested source directories."}
+{"kind":"note","ts":"2026-09-06T06:04:00.000Z","task":"scout/01","role":"dev","attempt":2,"agentLabel":"dev:scout/01#2","phase":"end","message":"Inventory now includes nested sources."}
+{"kind":"note","ts":"2026-09-06T06:05:00.000Z","task":"scout/01","role":"judge","attempt":2,"agentLabel":"judge:scout/01#2","phase":"start","message":"Score inventory accuracy and coverage."}
+{"kind":"score","ts":"2026-09-06T06:06:00.000Z","task":"scout/01","attempt":2,"agentLabel":"judge:scout/01#2","weighted":4.5,"passed":true,"hardFailed":false,"missing":[],"threshold":4,"passOp":">=","breakdown":[{"name":"accuracy","weight":1,"score":5},{"name":"coverage","weight":1,"score":4}]}
+{"kind":"note","ts":"2026-09-06T06:07:00.000Z","task":"scout/01","role":"judge","attempt":2,"agentLabel":"judge:scout/01#2","phase":"end","message":"PASS: inventory is sufficient to draft the guide."}
+{"kind":"state","ts":"2026-09-06T06:08:00.000Z","task":"scout/01","state":"done","agentLabel":"judge:scout/01#2"}
+{"kind":"note","ts":"2026-09-06T06:09:00.000Z","task":"audit/01","role":"dev","attempt":1,"agentLabel":"dev:audit/01#1","phase":"start","message":"Check repository license evidence."}
+{"kind":"state","ts":"2026-09-06T06:10:00.000Z","task":"audit/01","state":"failed","message":"No license evidence found; owner decision required."}
+{"kind":"note","ts":"2026-09-06T06:11:00.000Z","task":"audit/01","role":"dev","attempt":1,"agentLabel":"dev:audit/01#1","phase":"end","message":"No license evidence found; owner decision required."}
+{"kind":"note","ts":"2026-09-06T06:12:00.000Z","task":"build/01","role":"dev","attempt":1,"agentLabel":"dev:build/01#1","phase":"start","message":"Draft guide from the completed inventory."}
