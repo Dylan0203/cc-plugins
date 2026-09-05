@@ -196,6 +196,9 @@ function aggregateByTask(
       byTask.set(entry.task, aggregate);
     }
 
+    // Keep state-only tasks in the map, but declarations contribute no attempts or agent lifecycle.
+    if (entry.kind === "state") continue;
+
     aggregate.attempts = Math.max(aggregate.attempts, entry.attempt ?? 0);
 
     if (entry.kind === "score") {
@@ -292,6 +295,7 @@ type IndexedRow = FleetRow & {
 };
 
 function roleFromEntry(entry: FlightlogEntry, parsed: ParsedLabel): AgentRole {
+  if (entry.kind === "state") return "unknown";
   if (parsed.role !== "unknown") return parsed.role;
   if (entry.kind === "score") return "judge";
   return (KNOWN_ROLES as readonly string[]).includes(entry.role)
@@ -439,6 +443,8 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
   };
 
   entries.forEach((entry, order) => {
+    // Node declarations never open, close, or create an agent row.
+    if (entry.kind === "state") return;
     const parsed = parseAgentLabel(entry.agentLabel ?? "");
     const identity =
       entry.kind === "note"

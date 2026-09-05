@@ -1,16 +1,18 @@
 #!/usr/bin/env bun
 /**
- * flightlog — append agent narrative to an autopilot run's audit trail and
- * render it to RUNLOG.md.
+ * flightlog — append agent narrative or node state to an autopilot run's
+ * audit trail and render it to RUNLOG.md.
  *
  * The orchestrator script has no filesystem access, so narrative entries are
  * written by the tool-capable Dev / Review / Final-review agents calling this
- * CLI. Score verdicts are written separately by `score-task.ts --log`; both
+ * CLI. Node declarations use `state`; score verdicts use `score-task.ts --log`. All
  * land in the same JSONL trail under `docs/<slug>/.flightlog/`.
  *
  * Usage:
  *   bun flightlog.ts log <logfile> --task <ref> --role <role> [--attempt N] \
  *       [--agent <label>] [--phase <start|end>] [--message "<text>"]
+ *   bun flightlog.ts state <logfile> --task <ref> --state done|blocked|failed \
+ *       [--agent <label>] [--message "<why>"]
  *   bun flightlog.ts report <logfile> [--slug <slug>] [--out <RUNLOG.md>]
  *
  * `report` parses the JSONL trail and writes a grouped, human-readable
@@ -25,6 +27,7 @@ import {
   readLog,
   renderRunlog,
   type NoteEntry,
+  type StateEntry,
 } from "./lib/flightlog";
 
 /** Build a flightlog note entry from narrative metadata (pure). */
@@ -45,6 +48,24 @@ export function buildNoteEntry(meta: {
     attempt: meta.attempt,
     agentLabel: meta.agentLabel,
     ...(meta.phase === undefined ? {} : { phase: meta.phase }),
+    message: meta.message,
+  };
+}
+
+/** Build a node declaration from caller-stamped metadata (pure). */
+export function buildStateEntry(meta: {
+  task: string;
+  state: "done" | "blocked" | "failed";
+  ts: string;
+  agentLabel?: string;
+  message?: string;
+}): StateEntry {
+  return {
+    kind: "state",
+    ts: meta.ts,
+    task: meta.task,
+    state: meta.state,
+    agentLabel: meta.agentLabel,
     message: meta.message,
   };
 }
@@ -93,6 +114,40 @@ async function main() {
     return;
   }
 
+  if (cmd === "state") {
+    if (!logFile) usage();
+    const task = flagValue(rest, "--task");
+    const state = flagValue(rest, "--state");
+    const message = flagValue(rest, "--message", { allowDashValue: true });
+    if (!task) {
+      console.error("flightlog state requires --task");
+      process.exit(2);
+    }
+    if (!state) {
+      console.error("flightlog state requires --state");
+      process.exit(2);
+    }
+    if (state !== "done" && state !== "blocked" && state !== "failed") {
+      console.error("flightlog --state must be done, blocked or failed");
+      process.exit(2);
+    }
+    if (state !== "done" && !message) {
+      console.error("flightlog state requires --message for blocked or failed");
+      process.exit(2);
+    }
+    await appendEntry(
+      logFile,
+      buildStateEntry({
+        task,
+        state,
+        ts: new Date().toISOString(),
+        agentLabel: flagValue(rest, "--agent"),
+        message,
+      }),
+    );
+    return;
+  }
+
   if (cmd === "report") {
     if (!logFile) usage();
     const entries = await readLog(logFile);
@@ -111,6 +166,7 @@ function usage(): never {
     [
       "Usage:",
       "  bun flightlog.ts log <logfile> --task <ref> --role <role> [--attempt N] [--agent <label>] [--phase <start|end>] [--message <text>]",
+      "  bun flightlog.ts state <logfile> --task <ref> --state done|blocked|failed [--agent <label>] [--message <why>]",
       "  bun flightlog.ts report <logfile> [--slug <slug>] [--out <RUNLOG.md>]",
     ].join("\n"),
   );

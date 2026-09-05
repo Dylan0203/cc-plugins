@@ -1,10 +1,11 @@
 /**
  * Flightlog — the append-only audit trail for an autopilot run.
  *
- * Two kinds of entry land in one JSONL file under `docs/<slug>/.flightlog/`:
+ * Three kinds of entry land in one JSONL file under `docs/<slug>/.flightlog/`:
  *
  *   - `score` — a deterministic verdict appended by `score-task.ts --log`.
  *   - `note`  — agent narrative appended by `flightlog.ts log`.
+ *   - `state` — node declaration appended by `flightlog.ts state`.
  *
  * The orchestrator script can't touch the filesystem, so logging always comes
  * from a bundled script run by a tool-capable agent. Every entry records an
@@ -69,7 +70,18 @@ export type NoteEntry = {
   message: string;
 };
 
-export type FlightlogEntry = ScoreEntry | NoteEntry;
+export type StateEntry = {
+  kind: "state";
+  ts: string;
+  /** Node ref, in the declared graph's `<lane>/<NN>` shape. */
+  task: string;
+  state: "done" | "blocked" | "failed";
+  agentLabel?: string;
+  /** One line of why. Required for `blocked` and `failed`. */
+  message?: string;
+};
+
+export type FlightlogEntry = ScoreEntry | NoteEntry | StateEntry;
 
 export const FLIGHTLOG_DIRNAME = ".flightlog";
 
@@ -107,8 +119,12 @@ export function parseLines(lines: string[]): FlightlogEntry[] {
     if (!line) continue;
     try {
       const parsed = JSON.parse(line);
-      if (parsed && (parsed.kind === "score" || parsed.kind === "note")) {
-        entries.push(parsed as FlightlogEntry);
+      // Older readers drop state and retain notes; this reader likewise drops future kinds.
+      if (
+        parsed &&
+        (parsed.kind === "score" || parsed.kind === "note" || parsed.kind === "state")
+      ) {
+        entries.push(parsed);
       }
     } catch {
       // Drop the malformed line, keep the rest.
@@ -149,8 +165,13 @@ export function renderRunlog(
 }
 
 function renderLine(e: FlightlogEntry): string {
-  const attempt = e.attempt ? `attempt ${e.attempt} · ` : "";
   const agent = e.agentLabel ? ` _(agent: ${e.agentLabel})_` : "";
+  // Declarations share task headings but render without an agent role or attempt.
+  if (e.kind === "state") {
+    const message = e.message ? `: ${e.message}` : "";
+    return `- state — ${e.state}${message}${agent}`;
+  }
+  const attempt = e.attempt ? `attempt ${e.attempt} · ` : "";
   if (e.kind === "note") {
     return `- ${attempt}${e.role} — ${e.message}${agent}`;
   }

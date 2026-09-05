@@ -3,6 +3,7 @@ import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
 import type {
   FlightlogEntry,
   ScoreEntry,
+  StateEntry,
 } from "../../flightplan/scripts/lib/flightlog";
 import { formatEntry, parseLog } from "../../flightplan/scripts/lib/flightlog";
 import {
@@ -787,5 +788,31 @@ describe("gate outcome", () => {
     ]);
 
     expect(rows[0].outcome).toBeUndefined();
+  });
+});
+
+describe("state declarations are inert in fleet", () => {
+  test("preserves rows, open starts, attempts and scores with interleaved states", () => {
+    const entries = [
+      note("ui/03", "dev", 2, "2026-01-01T00:00:00Z", "start", "dev:ui/03#2"),
+      score("ui/03", 2, "2026-01-01T00:00:02Z"),
+      note("ui/04", "dev", 1, "2026-01-01T00:00:03Z", "end"),
+    ];
+    const declarations: StateEntry["state"][] = ["done", "blocked", "failed"];
+    const states: StateEntry[] = declarations.map((state) => ({
+      kind: "state",
+      task: "ui/03",
+      ts: "2026-01-01T00:00:01Z",
+      state,
+      agentLabel: "dev:ui/03#99",
+      message: "Declared by workflow",
+    }));
+    const mixed = [entries[0], ...states, ...entries.slice(1)];
+    const byRef = { "ui/03": task("ui/03"), "ui/04": task("ui/04") };
+    expect(aggregateFleet(states)).toEqual([]);
+    expect(aggregateFleet(mixed)).toEqual(aggregateFleet(entries));
+    expect(deriveTaskViews(byRef, mixed)).toEqual(deriveTaskViews(byRef, entries));
+    expect(deriveTaskViews(byRef, mixed)[0]).toMatchObject({ attempts: 2, state: "in-progress" });
+    expect(deriveTaskViews(byRef, states)[0]).toMatchObject({ attempts: 0, latestScore: null, state: "ready" });
   });
 });

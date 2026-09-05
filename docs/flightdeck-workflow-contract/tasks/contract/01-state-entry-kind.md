@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: contract/02, contract/03, deck/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -186,26 +186,26 @@ Worth asserting specifically, because each one is a silent failure if wrong:
 
 ## Acceptance criteria
 
-- [ ] `StateEntry` exists with exactly the fields above, and `FlightlogEntry` is
+- [x] `StateEntry` exists with exactly the fields above, and `FlightlogEntry` is
       the three-way union.
-- [ ] `parseLines` keeps `state` lines, still drops unknown kinds, and still
+- [x] `parseLines` keeps `state` lines, still drops unknown kinds, and still
       drops malformed JSON without aborting the rest of the file.
-- [ ] `buildStateEntry` is pure and takes `ts` from its caller.
-- [ ] The `state` subcommand rejects a missing `--task`, a missing or invalid
+- [x] `buildStateEntry` is pure and takes `ts` from its caller.
+- [x] The `state` subcommand rejects a missing `--task`, a missing or invalid
       `--state`, and a missing `--message` when the state is `blocked` or
       `failed`, exiting `2` in each case.
-- [ ] `aggregateFleet` produces no row for a `state` entry, and `attempts` in
+- [x] `aggregateFleet` produces no row for a `state` entry, and `attempts` in
       the by-task rollup is unaffected by them.
-- [ ] `renderRunlog` handles a trail containing `state` entries and its output
+- [x] `renderRunlog` handles a trail containing `state` entries and its output
       for note-and-score trails is unchanged.
-- [ ] No consumer was fixed with a type cast or a non-null assertion.
+- [x] No consumer was fixed with a type cast or a non-null assertion.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/` passes.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes — the whole
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/` passes.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes — the whole
       autopilot suite, unmodified except for the additions above.
-- [ ] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. Run the
+- [x] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. Run the
       typecheck against the root `tsconfig.json` with no file arguments; naming
       files drops the config and fabricates errors. The repo-wide run is not
       green — 86 pre-existing errors sit outside these paths — so a zero total
