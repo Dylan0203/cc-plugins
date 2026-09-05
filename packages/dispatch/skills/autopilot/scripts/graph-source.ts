@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { basename, isAbsolute, join } from "node:path";
 import type { GraphNode, NodeValidity } from "./graph-node";
+import { type FlightlogEntry, type StateEntry, runLogPath } from "../../flightplan/scripts/lib/flightlog";
 
 export type GraphSourceError = { file: string; bucket: string; reason: string };
 
@@ -151,4 +152,53 @@ export async function loadGraph(dir: string): Promise<ParsedGraph> {
     };
   }
   return parseGraph(text, file, fallbackTitle);
+}
+
+
+/** Pure. Folds state declarations into a new node map without changing either input. */
+export function applyStateEntries(
+  nodes: Record<string, GraphNode>,
+  entries: FlightlogEntry[],
+): { nodes: Record<string, GraphNode>; errors: GraphSourceError[] } {
+  const errors: GraphSourceError[] = [];
+  const unknownRefs = new Set<string>();
+  const file = runLogPath("");
+  for (const entry of entries) {
+    if (Object.hasOwn(nodes, entry.task) || unknownRefs.has(entry.task)) continue;
+    unknownRefs.add(entry.task);
+    errors.push({ file, bucket: FILE_BUCKET, reason: `Entry task ${display(entry.task)} references an undeclared node` });
+  }
+
+  const latest = new Map<string, StateEntry>();
+  for (const entry of entries) {
+    if (entry.kind === "state" && Object.hasOwn(nodes, entry.task)) latest.set(entry.task, entry);
+  }
+
+  const mapped = Object.fromEntries(Object.entries(nodes).map(([ref, node]) => {
+    // The existing ladder requires todo for an unstarted node to become ready or in-progress.
+    const updated = { ...node, status: node.status ?? "todo" };
+    const entry = latest.get(ref);
+    if (entry !== undefined) {
+      switch (entry.state) {
+        case "done":
+          updated.status = "done";
+          updated.validity = { kind: "complete" };
+          break;
+        case "blocked":
+          updated.status = "blocked";
+          updated.validity = { kind: "unfinished", status: "blocked" };
+          break;
+        case "failed":
+          updated.validity = { kind: "invalid", rule: "failed", reason: entry.message ?? "agent reported failure with no message" };
+          break;
+        default: {
+          const reason = `Node ${display(ref)} declares unknown state ${display(entry.state)}`;
+          updated.validity = { kind: "invalid", rule: "unknown-state", reason };
+          errors.push({ file, bucket: node.bucket, reason });
+        }
+      }
+    }
+    return [ref, updated];
+  }));
+  return { nodes: mapped, errors };
 }

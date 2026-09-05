@@ -2,8 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { type FlightlogEntry, type StateEntry, parseLog } from "../../flightplan/scripts/lib/flightlog";
+import { deriveTaskViews } from "./fleet";
+import { buildTreePayload } from "./tree-api";
 import { type GraphNode, unmetNodeDependencies } from "./graph-node";
-import { loadGraph, parseGraph } from "./graph-source";
+import { applyStateEntries, loadGraph, parseGraph } from "./graph-source";
 
 function node(overrides: Record<string, unknown> = {}) {
   return { ref: "build/01", lane: "build", title: "Build", ...overrides };
@@ -177,4 +180,127 @@ describe("loadGraph", () => {
       });
     }));
   }
+});
+
+
+function loadedNode(overrides: Partial<GraphNode> = {}): GraphNode {
+  return { ...expectedNode, ref: "build-step/01", bucket: "build-step", ...overrides };
+}
+
+function declaration(state: StateEntry["state"], overrides: Partial<StateEntry> = {}): StateEntry {
+  return { kind: "state", task: "build-step/01", ts: "2026-01-01T00:00:00Z", state, ...overrides };
+}
+
+describe("applyStateEntries", () => {
+  for (const [state, status, validity] of [
+    ["done", "done", { kind: "complete" }],
+    ["blocked", "blocked", { kind: "unfinished", status: "blocked" }],
+    ["failed", "in-progress", { kind: "invalid", rule: "failed", reason: "agent failed" }],
+  ] as const) {
+    test(`maps ${state} without mutating either input`, () => {
+      const original = loadedNode({ status: "in-progress" });
+      const nodes = { [original.ref]: original };
+      const entries = [declaration(state, { message: "agent failed" })];
+      const before = structuredClone({ nodes, entries });
+      const result = applyStateEntries(nodes, entries);
+      expect(result).toEqual({ nodes: { [original.ref]: { ...original, status, validity } }, errors: [] });
+      expect({ nodes, entries }).toEqual(before);
+      expect(result.nodes).not.toBe(nodes);
+    });
+  }
+
+  test("uses a useful failure reason when the message is absent", () => {
+    const original = loadedNode();
+    expect(applyStateEntries({ [original.ref]: original }, [declaration("failed")])).toEqual({
+      nodes: { [original.ref]: { ...original, status: "todo", validity: {
+        kind: "invalid", rule: "failed", reason: "agent reported failure with no message",
+      } } }, errors: [],
+    });
+  });
+
+  test("last trail position wins for equal and backwards timestamps", () => {
+    const original = loadedNode();
+    for (const ts of ["2026-01-01T00:00:00Z", "2025-01-01T00:00:00Z"]) {
+      expect(applyStateEntries({ [original.ref]: original }, [
+        declaration("done"), declaration("failed"), declaration("blocked", { ts }),
+      ])).toEqual({ nodes: { [original.ref]: {
+        ...original, status: "blocked", validity: { kind: "unfinished", status: "blocked" },
+      } }, errors: [] });
+    }
+  });
+
+  test("unknown latest state invalidates the node and reports an error", () => {
+    const original = loadedNode();
+    const entries = parseLog(JSON.stringify({ ...declaration("done"), state: "paused" }));
+    const reason = 'Node "build-step/01" declares unknown state "paused"';
+    expect(applyStateEntries({ [original.ref]: original }, entries)).toEqual({
+      nodes: { [original.ref]: { ...original, status: "todo", validity: { kind: "invalid", rule: "unknown-state", reason } } },
+      errors: [{ file: ".flightlog/run.jsonl", bucket: "build-step", reason }],
+    });
+    expect(applyStateEntries({ [original.ref]: original }, [...entries, declaration("done")])).toEqual({
+      nodes: { [original.ref]: { ...original, status: "done", validity: { kind: "complete" } } }, errors: [],
+    });
+  });
+
+  test("checks all entry kinds and reports each unknown ref once", () => {
+    const original = loadedNode({ status: "todo" });
+    const entries: FlightlogEntry[] = [
+      declaration("done", { task: "missing-state/01" }),
+      { kind: "note", task: "missing-note/01", ts: "same", role: "dev", message: "hi" },
+      { kind: "score", task: "missing-score/01", ts: "same", attempt: 1, weighted: 5,
+        passed: true, hardFailed: false, missing: [], threshold: 4, passOp: ">=", breakdown: [] },
+      declaration("failed", { task: "missing-note/01" }),
+      declaration("done", { task: "__proto__" }),
+    ];
+    expect(applyStateEntries({ [original.ref]: original }, [...entries, ...entries])).toEqual({
+      nodes: { [original.ref]: original },
+      errors: ["missing-state/01", "missing-note/01", "missing-score/01", "__proto__"].map((ref) => ({
+        file: ".flightlog/run.jsonl", bucket: "", reason: `Entry task ${JSON.stringify(ref)} references an undeclared node`,
+      })),
+    });
+  });
+
+  test("preserves untouched fields and normalizes only null status", () => {
+    const original = loadedNode();
+    const done = loadedNode({ ref: "build-step/02", status: "done", validity: { kind: "complete" } });
+    expect(applyStateEntries({ [original.ref]: original, [done.ref]: done }, [])).toEqual({
+      nodes: { [original.ref]: { ...original, status: "todo" }, [done.ref]: done }, errors: [],
+    });
+    expect(deriveTaskViews(applyStateEntries({ [original.ref]: original }, []).nodes, [])[0]).toEqual({
+      ref: original.ref, bucket: original.bucket, nn: original.nn, title: original.title,
+      status: "todo", state: "ready", invalidReason: null, blockedBy: [], dependsOn: [], blocks: [],
+      finalReview: false, attempts: 0, latestScore: null,
+    });
+  });
+
+  test("derives all five states and forwards mapping errors into the payload", () => {
+    const nodes = Object.fromEntries(["01", "02", "03", "04", "05"].map((nn) => {
+      const value = loadedNode({ ref: `build-step/${nn}`, nn, dependsOn: nn === "03" ? ["build-step/01"] : nn === "04" ? ["build-step/02"] : [] });
+      return [value.ref, value];
+    }));
+    const entries: FlightlogEntry[] = [declaration("done"),
+      { kind: "note", task: "build-step/02", ts: "same", role: "dev", phase: "start", message: "working" },
+      declaration("failed", { task: "build-step/05", message: "broken" }),
+      declaration("done", { task: "missing-step/01" }),
+    ];
+    const mapped = applyStateEntries(nodes, entries);
+    const payload = buildTreePayload({ slug: "run", planTitle: "Run", repo: "repo", bucketDirs: ["build-step"],
+      loaded: { byRef: mapped.nodes, errors: mapped.errors }, entries });
+    expect(payload.tasks.map(({ state }) => state)).toEqual(["done", "in-progress", "ready", "blocked", "invalid"]);
+    expect(payload.counts).toEqual({ total: 5, done: 1, inProgress: 1, ready: 1, blocked: 1, invalid: 1 });
+    expect(payload.errors).toEqual(mapped.errors);
+  });
+
+  test("state declarations cannot close an open start even with a matching runtime identity", () => {
+    const original = loadedNode({ status: "todo" });
+    // Parsed notes allow free-form roles, including the value an unguarded state entry would read.
+    const entries = parseLog([
+      { kind: "note", task: original.ref, ts: "same", phase: "start", message: "working" },
+      declaration("done"),
+    ].map((entry) => JSON.stringify(entry)).join("\n"));
+    expect(deriveTaskViews({ [original.ref]: original }, entries)).toEqual(
+      deriveTaskViews({ [original.ref]: original }, entries.slice(0, 1)),
+    );
+    expect(deriveTaskViews({ [original.ref]: original }, entries)[0].state).toBe("in-progress");
+  });
 });
