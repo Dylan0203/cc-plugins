@@ -93,12 +93,10 @@ async function main() {
     const message = flagValue(rest, "--message", { allowDashValue: true });
     const phase = flagValue(rest, "--phase");
     if (phase !== undefined && phase !== "start" && phase !== "end") {
-      console.error("flightlog --phase must be start or end");
-      process.exit(2);
+      fail("flightlog --phase must be start or end");
     }
     if (!task || !role || (!message && phase !== "start")) {
-      console.error("flightlog log requires --task, --role and --message");
-      process.exit(2);
+      fail("flightlog log requires --task, --role and --message");
     }
     const attemptRaw = flagValue(rest, "--attempt");
     const entry = buildNoteEntry({
@@ -120,20 +118,16 @@ async function main() {
     const state = flagValue(rest, "--state");
     const message = flagValue(rest, "--message", { allowDashValue: true });
     if (!task) {
-      console.error("flightlog state requires --task");
-      process.exit(2);
+      fail("flightlog state requires --task");
     }
     if (!state) {
-      console.error("flightlog state requires --state");
-      process.exit(2);
+      fail("flightlog state requires --state");
     }
     if (state !== "done" && state !== "blocked" && state !== "failed") {
-      console.error("flightlog --state must be done, blocked or failed");
-      process.exit(2);
+      fail("flightlog --state must be done, blocked or failed");
     }
     if (state !== "done" && !message) {
-      console.error("flightlog state requires --message for blocked or failed");
-      process.exit(2);
+      fail("flightlog state requires --message for blocked or failed");
     }
     await appendEntry(
       logFile,
@@ -161,8 +155,14 @@ async function main() {
   usage();
 }
 
+/** Every CLI rejection leaves through here, so all of them exit 2. */
+function fail(message: string): never {
+  console.error(message);
+  process.exit(2);
+}
+
 function usage(): never {
-  console.error(
+  fail(
     [
       "Usage:",
       "  bun flightlog.ts log <logfile> --task <ref> --role <role> [--attempt N] [--agent <label>] [--phase <start|end>] [--message <text>]",
@@ -170,7 +170,6 @@ function usage(): never {
       "  bun flightlog.ts report <logfile> [--slug <slug>] [--out <RUNLOG.md>]",
     ].join("\n"),
   );
-  process.exit(2);
 }
 
 if (import.meta.main) {

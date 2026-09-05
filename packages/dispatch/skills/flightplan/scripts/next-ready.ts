@@ -31,6 +31,7 @@ import {
   type ParsedTask,
   type TaskRef,
 } from "./lib/parse-task";
+import { nodesFromParsedTasks, unmetNodeDependencies } from "./lib/graph-node";
 
 export type LoadError = { file: string; reason: string };
 
@@ -109,26 +110,6 @@ export async function loadAllTasks(tasksDir: string): Promise<LoadResult> {
     }
   }
   return { byRef, pathByRef, buckets: bucketNames, errors, invalid };
-}
-
-/**
- * The dependencies of `task` that are not satisfied yet, as refs.
- *
- * The readiness rule lives here alone: a dependency is satisfied only when the
- * upstream task is *validly* complete — `Status: done` with every gate checkbox
- * ticked. A task claiming `done` over unticked boxes keeps blocking, so a lost
- * gate result can never unlock downstream work. `findReady` and the flightdeck's
- * task views both read this, so the CLI and the dashboard can never disagree
- * about what blocks.
- */
-export function unmetDependencies(
-  task: ParsedTask,
-  byRef: Record<string, ParsedTask>,
-): string[] {
-  return task.dependsOn.map(refToString).filter((ref) => {
-    const dep = byRef[ref];
-    return dep === undefined || taskValidity(dep).kind !== "complete";
-  });
 }
 
 /** A ready task ref plus whether it is the closing final-review task. */
@@ -222,9 +203,12 @@ export function summarizeTree(
 
 export function findReady(byRef: Record<string, ParsedTask>): TaskRef[] {
   const ready: TaskRef[] = [];
-  for (const task of Object.values(byRef)) {
+  // Built once, not per task: readiness is the same rule the dashboard reads, and
+  // it is expressed over nodes. See `unmetNodeDependencies`.
+  const nodes = nodesFromParsedTasks(byRef);
+  for (const [ref, task] of Object.entries(byRef)) {
     if (task.status !== "todo") continue;
-    if (unmetDependencies(task, byRef).length === 0) {
+    if (unmetNodeDependencies(nodes[ref]!, nodes).length === 0) {
       ready.push({ bucket: task.bucket, nn: task.nn });
     }
   }
