@@ -303,3 +303,18 @@ describe("repoName", () => {
     expect(repoName(plan)).toBe("");
   });
 });
+
+
+describe("source bucket ordering", () => {
+  for (const deckSource of ["tasks", "graph"] as const) {
+    test(`${deckSource} carries its source and applies its ordering rule`, () => {
+      const bucketDirs = ["z-build", "a-review", "m-empty"];
+      const payload = buildTreePayload({ ...input({}, bucketDirs), deckSource });
+      expect(payload.deckSource).toBe(deckSource);
+      expect(payload.buckets).toEqual(deckSource === "graph"
+        ? ["z-build", "a-review", "m-empty"]
+        : ["a-review", "m-empty", "z-build"]);
+      expect(bucketDirs).toEqual(["z-build", "a-review", "m-empty"]);
+    });
+  }
+});

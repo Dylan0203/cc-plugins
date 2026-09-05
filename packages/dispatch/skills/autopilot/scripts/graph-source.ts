@@ -1,7 +1,29 @@
+import { statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { basename, isAbsolute, join } from "node:path";
 import type { GraphNode, NodeValidity } from "./graph-node";
-import { type FlightlogEntry, type StateEntry, runLogPath } from "../../flightplan/scripts/lib/flightlog";
+import { type FlightlogEntry, type StateEntry, readLog, runLogPath } from "../../flightplan/scripts/lib/flightlog";
+
+export type DeckSource =
+  | { kind: "tasks" }
+  | { kind: "graph" }
+  | { kind: "none" };
+
+/** Impure: looks for a tasks/ directory, then a graph.json file. */
+export function detectSource(planDir: string): DeckSource {
+  // An existing task plan keeps its behaviour when someone drops a graph file beside it.
+  try {
+    if (statSync(join(planDir, "tasks")).isDirectory()) return { kind: "tasks" };
+  } catch {
+    // An absent or inaccessible task directory leaves the graph candidate open.
+  }
+  try {
+    if (statSync(join(planDir, "graph.json")).isFile()) return { kind: "graph" };
+  } catch {
+    // The caller owns path validation and its error messages.
+  }
+  return { kind: "none" };
+}
 
 export type GraphSourceError = { file: string; bucket: string; reason: string };
 
@@ -201,4 +223,25 @@ export function applyStateEntries(
     return [ref, updated];
   }));
   return { nodes: mapped, errors };
+}
+
+
+/** Impure: adapts the graph and shared trail for the existing pure payload builder. */
+export async function loadGraphPlan(planDir: string) {
+  const [graph, entries] = await Promise.all([
+    loadGraph(planDir),
+    readLog(runLogPath(planDir)),
+  ]);
+  const resolved = applyStateEntries(graph.nodes, entries);
+  return {
+    slug: basename(planDir),
+    planTitle: graph.title,
+    repo: basename(graph.repoRoot),
+    bucketDirs: graph.lanes,
+    loaded: {
+      byRef: resolved.nodes,
+      errors: [...graph.errors, ...resolved.errors],
+    },
+    entries,
+  };
 }

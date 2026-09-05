@@ -1,5 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
+import { detectSource } from "./graph-source";
 import { decideStartup } from "./daemon-decision";
 import { readRecord, removeRecord } from "./daemon-record";
 
@@ -61,8 +62,8 @@ export function validatePlanDir(
     };
   }
 
-  if (!isDirectory(join(planDir, "tasks"))) {
-    return { ok: false, message: "--plan must contain a tasks/ directory" };
+  if (detectSource(planDir).kind === "none") {
+    return { ok: false, message: "--plan must contain a tasks/ directory or a graph.json file" };
   }
 
   return { ok: true };

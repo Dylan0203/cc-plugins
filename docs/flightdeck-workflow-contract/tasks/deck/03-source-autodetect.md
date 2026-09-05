@@ -7,7 +7,7 @@
 >
 > **Depends on**: deck/01, deck/02
 > **Blocks**: deck/04, deck/05, skill/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -208,25 +208,25 @@ the assertion proves nothing.
 
 ## Acceptance criteria
 
-- [ ] `detectSource` returns the tasks case for a directory holding only a task directory, the graph case for one holding only the contract file, and the none case for a directory holding neither.
-- [ ] `detectSource` returns the tasks case for a directory holding both, and a comment at the branch says why.
-- [ ] `validatePlanDir` accepts both shapes, and rejects the neither-shape with a message naming both the task directory and the contract file.
-- [ ] `validatePlanDir` still returns its existing two messages for a path that is not a directory and a path that does not exist.
-- [ ] `createServer` accepts a graph-source directory, and its thrown message names both accepted shapes.
-- [ ] The tree endpoint returns a well-formed payload for a graph-source directory: title, lanes, nodes, counts, and errors all populated from the graph and the trail.
-- [ ] The events endpoint responds for both source shapes, tailing the same trail path under each, with no branch on the log path.
-- [ ] The declared repo root is passed to the events handler as an option, and is `undefined` for the task-tree source so that path still walks up as before.
-- [ ] Declared lane order survives from the contract file to the payload's bucket list, unsorted, proven with an order that is not alphabetical.
-- [ ] The task-tree source still sorts its bucket list, proven by a test, and there is exactly one payload builder.
-- [ ] The payload and the events handler's options both carry the detected source as an explicit `deckSource` field, set once from the detector and never re-derived downstream, with the options' existing transcript-reader injection point untouched.
-- [ ] Every previously passing test in the autopilot script suite still passes, unmodified except where a new case was added.
+- [x] `detectSource` returns the tasks case for a directory holding only a task directory, the graph case for one holding only the contract file, and the none case for a directory holding neither.
+- [x] `detectSource` returns the tasks case for a directory holding both, and a comment at the branch says why.
+- [x] `validatePlanDir` accepts both shapes, and rejects the neither-shape with a message naming both the task directory and the contract file.
+- [x] `validatePlanDir` still returns its existing two messages for a path that is not a directory and a path that does not exist.
+- [x] `createServer` accepts a graph-source directory, and its thrown message names both accepted shapes.
+- [x] The tree endpoint returns a well-formed payload for a graph-source directory: title, lanes, nodes, counts, and errors all populated from the graph and the trail.
+- [x] The events endpoint responds for both source shapes, tailing the same trail path under each, with no branch on the log path.
+- [x] The declared repo root is passed to the events handler as an option, and is `undefined` for the task-tree source so that path still walks up as before.
+- [x] Declared lane order survives from the contract file to the payload's bucket list, unsorted, proven with an order that is not alphabetical.
+- [x] The task-tree source still sorts its bucket list, proven by a test, and there is exactly one payload builder.
+- [x] The payload and the events handler's options both carry the detected source as an explicit `deckSource` field, set once from the detector and never re-derived downstream, with the options' existing transcript-reader injection point untouched.
+- [x] Every previously passing test in the autopilot script suite still passes, unmodified except where a new case was added.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes with no failures.
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/` passes with no failures.
-- [ ] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. Run the typecheck against the root config, never a file list — naming files on the command line drops `types: ["bun"]` and buries real errors under fake ones. The repo-wide run is **not** green (86 pre-existing errors sit outside this plan), so a zero count is not the bar; an empty grep on these paths is.
-- [ ] A temp directory holding a valid contract file and a trail, served through `createServer`, answers `/api/tree` with lanes in the declared order — asserted in the test suite, not by hand.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes with no failures.
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/` passes with no failures.
+- [x] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. Run the typecheck against the root config, never a file list — naming files on the command line drops `types: ["bun"]` and buries real errors under fake ones. The repo-wide run is **not** green (86 pre-existing errors sit outside this plan), so a zero count is not the bar; an empty grep on these paths is.
+- [x] A temp directory holding a valid contract file and a trail, served through `createServer`, answers `/api/tree` with lanes in the declared order — asserted in the test suite, not by hand.
 
 ## Eval rubric
 

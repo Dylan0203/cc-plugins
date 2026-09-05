@@ -90,6 +90,8 @@ export function eventsHandler(
   planDir: string,
   options?: {
     projectsRoot?: string;
+    repoRoot?: string;
+    deckSource?: "tasks" | "graph";
     source?: TranscriptSource;
     codexRoot?: string;
     codexSource?: CodexSource;

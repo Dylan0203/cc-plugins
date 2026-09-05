@@ -1,5 +1,9 @@
-import { describe, expect, test } from "bun:test";
-import { parseArgs } from "./launch";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { detectSource } from "./graph-source";
+import { parseArgs, validatePlanDir } from "./launch";
 
 describe("parseArgs", () => {
   test("parses valid arguments", () => {
@@ -39,5 +43,46 @@ describe("parseArgs", () => {
       ok: true,
       args: { plan: "/plan", port: 5757, open: true },
     });
+  });
+});
+
+const scratchDirs: string[] = [];
+function scratch(): string {
+  const dir = mkdtempSync(join(tmpdir(), "deck-source-"));
+  scratchDirs.push(dir);
+  return dir;
+}
+
+afterEach(() => {
+  for (const dir of scratchDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
+describe("detectSource and validatePlanDir", () => {
+  for (const shape of ["tasks", "graph", "both", "none"] as const) {
+    test(`detects and validates ${shape}`, () => {
+      const dir = scratch();
+      if (shape === "tasks" || shape === "both") mkdirSync(join(dir, "tasks"));
+      if (shape === "graph" || shape === "both") writeFileSync(join(dir, "graph.json"), "{}");
+      expect(detectSource(dir)).toEqual({ kind: shape === "both" ? "tasks" : shape });
+      expect(validatePlanDir(dir)).toEqual(shape === "none"
+        ? { ok: false, message: "--plan must contain a tasks/ directory or a graph.json file" }
+        : { ok: true });
+    });
+  }
+
+  test("requires a task directory or a graph file, not just their names", () => {
+    const dir = scratch();
+    writeFileSync(join(dir, "tasks"), "");
+    mkdirSync(join(dir, "graph.json"));
+    expect(detectSource(dir)).toEqual({ kind: "none" });
+    expect(validatePlanDir(dir)).toEqual({ ok: false, message: "--plan must contain a tasks/ directory or a graph.json file" });
+  });
+
+  test("keeps the missing path and non-directory errors", () => {
+    const dir = scratch();
+    const file = join(dir, "file");
+    writeFileSync(file, "");
+    expect(validatePlanDir(file)).toEqual({ ok: false, message: "--plan must be a directory" });
+    expect(validatePlanDir(join(dir, "absent"))).toEqual({ ok: false, message: "--plan directory does not exist" });
   });
 });

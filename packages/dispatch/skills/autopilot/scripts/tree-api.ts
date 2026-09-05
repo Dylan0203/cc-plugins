@@ -14,6 +14,7 @@ export type Loaded = {
 };
 
 export type TreePayload = {
+  deckSource: "tasks" | "graph";
   slug: string;
   planTitle: string;
   /** Repo the plan lives in — empty when the plan sits outside one. */
@@ -105,6 +106,7 @@ const COUNT_KEY = {
 
 /** Pure: shapes the response. */
 export function buildTreePayload(input: {
+  deckSource?: "tasks" | "graph";
   slug: string;
   planTitle: string;
   repo: string;
@@ -125,10 +127,12 @@ export function buildTreePayload(input: {
   for (const task of tasks) counts[COUNT_KEY[task.state]] += 1;
 
   return {
+    deckSource: input.deckSource ?? "tasks",
     slug: input.slug,
     planTitle: input.planTitle,
     repo: input.repo,
-    buckets: [...input.bucketDirs].sort(),
+    // Directory order is meaningless; declared graph lanes are the author's road order.
+    buckets: input.deckSource === "graph" ? [...input.bucketDirs] : [...input.bucketDirs].sort(),
     tasks,
     counts,
     waves: summarizeWaves(tasks, input.entries),

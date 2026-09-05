@@ -1,6 +1,7 @@
 import { isAbsolute, join, resolve } from "node:path";
 import { removeRecord, writeRecord } from "./daemon-record";
 import { runLogPath } from "../../flightplan/scripts/lib/flightlog";
+import { detectSource, loadGraph, loadGraphPlan } from "./graph-source";
 import { eventsHandler } from "./events-api";
 import {
   main as launchMain,
@@ -57,9 +58,12 @@ export async function createServer(
   port: number,
   projectsRoot?: string,
 ): Promise<Bun.Server<unknown>> {
-  if (!isAbsolute(plan) || !validatePlanDir(plan).ok) {
-    throw new Error("plan must be absolute and contain a tasks/ directory");
+  const source = detectSource(plan);
+  if (!isAbsolute(plan) || source.kind === "none") {
+    throw new Error("plan must be absolute and contain a tasks/ directory or a graph.json file");
   }
+  const deckSource = source.kind;
+  const repoRoot = deckSource === "graph" ? (await loadGraph(plan)).repoRoot : undefined;
 
   let server: Bun.Server<unknown>;
 
@@ -82,7 +86,8 @@ export async function createServer(
         }
 
         if (url.pathname === "/api/tree") {
-          const result = buildTreePayload(await loadPlan(plan));
+          const loaded = await (deckSource === "graph" ? loadGraphPlan(plan) : loadPlan(plan));
+          const result = buildTreePayload({ ...loaded, deckSource });
           return new Response(JSON.stringify(result), {
             headers: { "Content-Type": "application/json" },
           });
@@ -91,6 +96,8 @@ export async function createServer(
         if (url.pathname === "/api/events") {
           return eventsHandler(request, runLogPath(plan), plan, {
             projectsRoot,
+            repoRoot,
+            deckSource,
           });
         }
 
