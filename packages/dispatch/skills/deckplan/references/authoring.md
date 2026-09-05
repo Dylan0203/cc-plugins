@@ -74,13 +74,8 @@ Once the run begins, allow agents only to append to the trail. Never let an agen
 
 ## Before the first run
 
-- [ ] Is the complete graph fixed before the script and checked against graph-contract sections 2–3?
+Work through graph-contract section 7's conformance checklist for the graph, the run identifier, and the prepared prompts. It is the single copy; do not restate it here. Then check the three items this guide adds about the script itself:
+
+- [ ] Is the complete graph fixed before the script, so layout has the whole node set?
 - [ ] Does the script use only Workflow globals, with no imports or filesystem access?
-- [ ] Are every initial prompt's CLI, log, and repository paths resolved and absolute?
-- [ ] Does a fresh run identifier exist beside the graph and appear identically in every initial prompt?
-- [ ] Does every agent announce first and complete last with matching ref, role, attempt, and label?
-- [ ] Does each finished unit append a state declaration instead of editing the graph or trail?
 - [ ] Do roles and retries reuse their declared node, with labels following the fleet convention?
-- [ ] Do all in-run write instructions preserve an append-only trail?
-- [ ] Does the re-run procedure confirm the previous run stopped and obtain approval before archiving or deleting its trail?
-- [ ] Does the closing explanation include the fully resolved watch command and account for reader support?

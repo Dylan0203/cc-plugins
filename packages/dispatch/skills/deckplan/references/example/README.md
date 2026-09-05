@@ -32,7 +32,6 @@ Use a new directory for this walkthrough so copying the fixture cannot overwrite
    Edit the copied graph's `repoRoot` to the absolute working repository path.
    The template intentionally carries `/absolute/path/to/working-repository`, an absolute placeholder that validates without encoding a developer's machine.
    Keep the saved trail at the example directory's top level: the runtime `.flightlog` directory creates a self-ignoring `.gitignore` on first append.
-   Tests read these template files directly, without placement or machine-specific substitutions.
 
 3. Check for an existing server on port 5758 before starting this foreground server. Choose another free port with `--port` if needed.
 
@@ -42,7 +41,7 @@ Use a new directory for this walkthrough so copying the fixture cannot overwrite
 
    Open `http://127.0.0.1:5758` in a browser.
    Keep the command running while inspecting the panels.
-   If the installed reader reports `--plan must contain a tasks/ directory`, use a graph-capable Dispatch build.
+   If the installed reader reports `--plan must contain a tasks/ directory` without naming `graph.json`, it predates graph support; use a graph-capable Dispatch build.
 
 4. Check the five panels below. Switch between the lanes and dependency graph views; expand a task or fleet row to inspect details.
 
@@ -98,7 +97,7 @@ Stop the foreground server with Ctrl-C when finished inspecting the fixture, or 
    | `CFG.repoRoot` | The repository the agents inspect; use the exact value in the copied graph's `repoRoot`. |
 
    Resolve `~` and shell variables before inserting these literals.
-   Read the five work prompts and adapt their report requirements to your repository.
+   Adapt the five work descriptions — the second argument of each `node(...)` call — to your repository. The prompt around them is built once by `node`, so the announce command, the state command, the end note, and the label always name the same node; change the ref in one place only.
    Keep all nodes and dependencies declared in the graph before execution.
    Keep announce/end identity values paired and retain the explicit success/failure state commands.
    The script gates the guide on a successful inventory and the guide review on a successful guide; unrelated documentation and license checks run in parallel.

@@ -42,4 +42,4 @@ Use the resolved absolute installed `autopilot/scripts` path and run directory t
 bun "<absolute autopilot/scripts path>/flightdeck.ts" --plan "<absolute run directory>"
 ```
 
-Check the installed reader's graph support before describing the invocation as usable: a launcher that reports `--plan must contain a tasks/ directory` still requires the task-tree reader. Use a graph-capable flightdeck build for graph runs; do not scaffold a dummy task tree to bypass that check. The launch flag comes from `autopilot/scripts/launch.ts`; the graph contract currently contains only trail command templates.
+Check the installed reader's graph support before describing the invocation as usable: a launcher that reports `--plan must contain a tasks/ directory` predates graph support. A graph-capable build names both sources in that message. Use a graph-capable flightdeck build for graph runs; do not scaffold a dummy task tree to bypass that check.
