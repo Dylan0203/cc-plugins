@@ -12,9 +12,9 @@ import {
 export type TranscriptSource = {
   /**
    * Re-scan and return the current state of every discovered agent.
-   * Cheap to call repeatedly: only bytes appended since the last call are read.
+   * Cheap to call repeatedly: only appended bytes are read unless the run id changes.
    */
-  read(): AgentUsage[];
+  read(runId?: string): AgentUsage[];
 };
 
 /**
@@ -211,12 +211,13 @@ function mentionsPlanDir(text: string, planDir: string): boolean {
 /**
  * Decide membership from the file's first complete line. Both prompt shapes embed
  * the plan's absolute directory path, so the file belongs to this plan when the
- * stringified `message.content` names a path under it. Permanent once decided either way.
+ * stringified `message.content` names a path under it. Permanent for one run identity.
  */
 function decideMembership(
   planDir: string,
   state: FileState,
   record: Record<string, unknown>,
+  runId?: string,
 ): void {
   const message =
     typeof record.message === "object" && record.message !== null
@@ -225,6 +226,12 @@ function decideMembership(
   const content = message ? message.content : undefined;
 
   if (!mentionsPlanDir(contentText(content), planDir)) {
+    state.membership = "excluded";
+    return;
+  }
+
+  // Identity separates runs; an elapsed-time window includes immediate retries because spawn-to-announce gaps need slack and runs have no minimum interval.
+  if (runId && !contentText(content).includes(runId)) {
     state.membership = "excluded";
     return;
   }
@@ -305,7 +312,12 @@ function collectExternalMarks(state: FileState, line: string): void {
   }
 }
 
-function ingestLine(planDir: string, state: FileState, rawLine: string): void {
+function ingestLine(
+  planDir: string,
+  state: FileState,
+  rawLine: string,
+  runId?: string,
+): void {
   const line = rawLine.trim();
   if (!line) return;
 
@@ -319,7 +331,7 @@ function ingestLine(planDir: string, state: FileState, rawLine: string): void {
   const record = parsed as Record<string, unknown>;
 
   if (state.membership === "pending") {
-    decideMembership(planDir, state, record);
+    decideMembership(planDir, state, record, runId);
   }
   if (state.membership !== "included") return;
 
@@ -354,6 +366,7 @@ function processFile(
   file: string,
   state: FileState,
   size: number,
+  runId?: string,
 ): void {
   const next = nextCursor(state.cursor, size);
   const from = next.reset ? 0 : next.from;
@@ -386,7 +399,7 @@ function processFile(
   state.cursor = size;
 
   for (const line of complete) {
-    ingestLine(planDir, state, line);
+    ingestLine(planDir, state, line, runId);
   }
 }
 
@@ -398,23 +411,35 @@ function processFile(
 export function createTranscriptSource(
   planDir: string,
   projectsRoot?: string,
+  repoRoot?: string,
+  runId?: string,
 ): TranscriptSource {
   const root = projectsRoot ?? join(homedir(), ".claude", "projects");
   const files = new Map<string, FileState>();
-  // A failure to resolve is deliberately NOT cached: the plan dir is routinely opened
-  // before the run starts, so `<projectsRoot>/<slug>/` often does not exist yet.
+  let cachedRunId = runId;
+  // Even when the directory does not exist yet (explicit root, pre-run), the cache succeeds.
+  // The walk "never located" (null root, cache never populated) is a different failure mode from
+  // "located but unattributed" (directory found but no transcripts carry this run's id).
   let cachedSlugDir: string | null = null;
 
   function resolveSlugDir(): string | null {
     if (cachedSlugDir !== null) return cachedSlugDir;
-    const repoRoot = repoRootOf(planDir);
-    if (repoRoot === null) return null;
-    cachedSlugDir = join(root, projectSlug(repoRoot));
+    // planDir stays the membership anchor; the repo root only chooses the directory to enumerate.
+    const resolvedRoot = repoRoot || repoRootOf(planDir);
+    // The run directory may sit outside any repository (contract: ~/.local/share/q-lab/flightdeck/<slug>),
+    // so a walk up from planDir would find nothing and silently report zero agents. The caller supplies the repo root instead.
+    if (resolvedRoot === null) return null;
+    cachedSlugDir = join(root, projectSlug(resolvedRoot));
     return cachedSlugDir;
   }
 
   return {
-    read(): AgentUsage[] {
+    read(currentRunId = runId): AgentUsage[] {
+      // Membership verdicts and their derived usage are keyed by run identity as well as file path.
+      if (currentRunId !== cachedRunId) {
+        files.clear();
+        cachedRunId = currentRunId;
+      }
       const slugDir = resolveSlugDir();
       if (slugDir === null) return [];
 
@@ -439,7 +464,7 @@ export function createTranscriptSource(
         if (state.membership !== "excluded") {
           try {
             const size = statSync(file).size;
-            processFile(planDir, file, state, size);
+            processFile(planDir, file, state, size, currentRunId);
           } catch (error) {
             // Told apart by errno, not a preceding `existsSync` — that would stat
             // every file twice on every pass to learn what this stat already reports.

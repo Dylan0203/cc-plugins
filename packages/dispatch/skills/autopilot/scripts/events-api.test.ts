@@ -6,7 +6,11 @@ import {
   eventsHandler,
   formatFleetFrame,
 } from "./events-api";
-import type { TranscriptSource } from "./usage-source";
+import { projectSlug, type TranscriptSource } from "./usage-source";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import type { FleetSnapshot } from "./events-api";
 import { emptyCounts, type AgentUsage, type TokenCounts } from "./usage-types";
 
 const entry: FlightlogEntry = {
@@ -227,4 +231,155 @@ describe("eventsHandler", () => {
       await reader.cancel();
     }
   }, 10_000);
+});
+
+describe("eventsHandler transcript membership", () => {
+  function fixture() {
+    const root = mkdtempSync(join(tmpdir(), "events-membership-"));
+    const planDir = join(root, "run");
+    const repoRoot = join(root, "declared-repo");
+    const projectsRoot = join(root, "projects");
+    mkdirSync(planDir);
+    const logPath = join(planDir, "run.jsonl");
+    writeFileSync(logPath, [entry, { ...entry, task: "server/06" }].map((item) => JSON.stringify(item)).join("\n") + "\n");
+    for (const [id, input] of [["old-id", 3], ["new-id", 7]] as const) {
+      const file = join(projectsRoot, projectSlug(repoRoot), "session", "subagents", "workflows", "wf_1", `agent-${id}.jsonl`);
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, [
+        { type: "user", timestamp: entry.ts, message: { content: `${planDir}/run.jsonl --task ${id === "old-id" ? "server/06" : "server/05"} --role dev run ${id} codex-run.ts` } },
+        { type: "assistant", timestamp: entry.ts, message: { model: "m", usage: { input_tokens: input } } },
+      ].map((record) => JSON.stringify(record)).join("\n") + "\n");
+    }
+    return { root, planDir, repoRoot, projectsRoot, logPath };
+  }
+
+  function connect(f: ReturnType<typeof fixture>, options: NonNullable<Parameters<typeof eventsHandler>[3]> = {}) {
+    const controller = new AbortController();
+    const response = eventsHandler(
+      new Request("http://localhost/api/events", { signal: controller.signal }),
+      f.logPath, f.planDir,
+      { repoRoot: f.repoRoot, projectsRoot: f.projectsRoot, codexSource: { read: () => [] }, ...options },
+    );
+    const reader = response.body!.getReader();
+    return {
+      async read(): Promise<FleetSnapshot> {
+        return frameData(String((await reader.read()).value)) as FleetSnapshot;
+      },
+      async close() {
+        controller.abort();
+        await reader.cancel();
+      },
+    };
+  }
+
+  function expectUsage(snapshot: FleetSnapshot, input: number, agentCount: number) {
+    expect(snapshot.usage.totals).toEqual(counts(input));
+    expect(snapshot.usage.agentCount).toBe(agentCount);
+    const byTask: Record<string, TokenCounts> = {};
+    if (input === 3 || agentCount === 2) byTask["server/06"] = counts(3);
+    if (input === 7 || agentCount === 2) byTask["server/05"] = counts(7);
+    if (input === 10 && agentCount === 1) byTask["server/05"] = counts(10);
+    expect(snapshot.usage.byTask).toEqual(byTask);
+    expect(snapshot.rows).toHaveLength(2);
+    for (const row of snapshot.rows) expect(row.usage).toEqual(row.ref === undefined ? undefined : byTask[row.ref]);
+  }
+
+  test("uses the declared root for transcript discovery and the codex cwd join", async () => {
+    const f = fixture();
+    const stream = connect(f, {
+      codexSource: { read: () => [{
+        file: "/rollout.jsonl", cwd: f.repoRoot, startedAt: entry.ts,
+        relayDir: null, originator: "codex_exec", counts: counts(42),
+      }] },
+    });
+    try {
+      const snapshot = await stream.read();
+      expectUsage(snapshot, 10, 2);
+      expect(snapshot.usage.codexTotals).toEqual(counts(42));
+      expect(snapshot.rows.filter((row) => row.codexUsage).map((row) => row.codexUsage)).toEqual([counts(42)]);
+    } finally {
+      await stream.close();
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+
+  test("handler: run id read from correct location (graph source)", async () => {
+    const f = fixture();
+    const logPath = join(f.planDir, ".flightlog", "run.jsonl");
+    mkdirSync(dirname(logPath), { recursive: true });
+    writeFileSync(logPath, [entry, { ...entry, task: "server/06" }].map((item) => JSON.stringify(item)).join("\n") + "\n");
+    // Production keeps run.id beside graph.json, one level above the flightlog.
+    writeFileSync(join(f.planDir, "run.id"), "new-id\n");
+    const stream = connect({ ...f, logPath }, { deckSource: "graph" });
+    try {
+      expectUsage(await stream.read(), 7, 1);
+    } finally {
+      await stream.close();
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+
+  test("graph identity appearing, changing, and disappearing updates one live connection", async () => {
+    const f = fixture();
+    const stream = connect(f, { deckSource: "graph" });
+    try {
+      expectUsage(await stream.read(), 0, 0);
+      writeFileSync(join(f.planDir, "run.id"), " old-id\n");
+      expectUsage(await stream.read(), 3, 1);
+      writeFileSync(join(f.planDir, "run.id"), "new-id\n");
+      expectUsage(await stream.read(), 7, 1);
+      rmSync(join(f.planDir, "run.id"));
+      expectUsage(await stream.read(), 0, 0);
+    } finally {
+      await stream.close();
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  }, 12_000);
+
+  test.each(["", "   \n", "directory"])("graph with absent content (%j) attributes nothing", async (content) => {
+    const f = fixture();
+    if (content === "directory") mkdirSync(join(f.planDir, "run.id"));
+    else writeFileSync(join(f.planDir, "run.id"), content);
+    const stream = connect(f, { deckSource: "graph" });
+    try {
+      expectUsage(await stream.read(), 0, 0);
+    } finally {
+      await stream.close();
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+
+  test("tasks and the default source ignore run.id and preserve every figure", async () => {
+    const f = fixture();
+    const before = connect(f, { deckSource: "tasks" });
+    try {
+      const baseline = await before.read();
+      expectUsage(baseline, 10, 2);
+      writeFileSync(join(f.planDir, "run.id"), "new-id");
+      for (const deckSource of ["tasks", undefined] as const) {
+        const after = connect(f, { deckSource });
+        try { expect(await after.read()).toEqual(baseline); }
+        finally { await after.close(); }
+      }
+    } finally {
+      await before.close();
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+
+  test("keeps the transcript reader injection and passes the current graph identity", async () => {
+    const f = fixture();
+    writeFileSync(join(f.planDir, "run.id"), "new-id");
+    const ids: Array<string | undefined> = [];
+    const stream = connect(f, { deckSource: "graph", source: {
+      read(runId?: string) { ids.push(runId); return [agent()]; },
+    } });
+    try {
+      expectUsage(await stream.read(), 10, 1);
+      expect(ids).toEqual(["new-id"]);
+    } finally {
+      await stream.close();
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
 });

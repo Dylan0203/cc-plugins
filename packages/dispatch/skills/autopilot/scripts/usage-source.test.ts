@@ -254,6 +254,110 @@ describe("emptyCounts / addUsage", () => {
 });
 
 describe("createTranscriptSource", () => {
+  test("explicit root overrides the walk while planDir remains the membership anchor", () => {
+    withTempDir((dir) => {
+      const planDir = join(dir, "run");
+      mkdirSync(join(planDir, ".git"), { recursive: true });
+      const projectsRoot = join(dir, "projects");
+      const explicitRoot = join(dir, "declared-repo");
+      jsonl(agentPath(projectsRoot, projectSlug(planDir), "walk"), [
+        announceUser(planDir, "walk/01", "dev"),
+      ]);
+      jsonl(agentPath(projectsRoot, projectSlug(explicitRoot), "explicit"), [
+        announceUser(planDir, "explicit/01", "dev"),
+        assistant("m", { input_tokens: 7 }),
+      ]);
+      jsonl(agentPath(projectsRoot, projectSlug(explicitRoot), "other"), [
+        announceUser(explicitRoot, "other/01", "dev"),
+      ]);
+      const agents = createTranscriptSource(planDir, projectsRoot, explicitRoot).read();
+      expect(agents.map((agent) => agent.task)).toEqual(["explicit/01"]);
+      expect(agents[0]!.counts.input).toBe(7);
+    });
+  });
+
+  test.each(["existing", "deleted"] as const)("explicit %s root outside git returns transcripts", (state) => {
+    withTempDir((dir) => {
+      const planDir = join(dir, "run");
+      const repoRoot = join(dir, "repo");
+      mkdirSync(planDir);
+      mkdirSync(repoRoot);
+      if (state === "deleted") rmSync(repoRoot, { recursive: true });
+      expect(repoRootOf(planDir)).toBeNull();
+      const projectsRoot = join(dir, "projects");
+      jsonl(agentPath(projectsRoot, projectSlug(repoRoot), "a"), [
+        announceUser(planDir, "work/01", "dev"),
+        assistant("m", { input_tokens: 9 }),
+      ]);
+      expect(createTranscriptSource(planDir, projectsRoot, repoRoot).read()[0]!.counts.input).toBe(9);
+    });
+  });
+
+  test("explicit root caches the slug before its transcript directory appears", () => {
+    withTempDir((dir) => {
+      const planDir = join(dir, "run");
+      const repoRoot = join(dir, "absent");
+      const projectsRoot = join(dir, "projects");
+      const source = createTranscriptSource(planDir, projectsRoot, repoRoot);
+      expect(source.read()).toEqual([]);
+      jsonl(agentPath(projectsRoot, projectSlug(repoRoot), "a"), [
+        announceUser(planDir, "work/01", "dev"),
+      ]);
+      expect(source.read()).toHaveLength(1);
+    });
+  });
+
+  test("omitted or empty explicit root preserves walk results", () => {
+    withTempDir((dir) => {
+      mkdirSync(join(dir, ".git"));
+      const planDir = join(dir, "run");
+      mkdirSync(planDir);
+      const projectsRoot = join(dir, "projects");
+      jsonl(agentPath(projectsRoot, projectSlug(dir), "a"), [
+        announceUser(planDir, "work/01", "dev"),
+        assistant("m", { input_tokens: 11 }),
+      ]);
+      const explicit = createTranscriptSource(planDir, projectsRoot, dir).read();
+      expect(explicit).toHaveLength(1);
+      expect(createTranscriptSource(planDir, projectsRoot).read()).toEqual(explicit);
+      expect(createTranscriptSource(planDir, projectsRoot, "").read()).toEqual(explicit);
+    });
+  });
+
+  test("undefined explicit root falls back to the repository walk", () => {
+    withTempDir((dir) => {
+      mkdirSync(join(dir, ".git"));
+      const planDir = join(dir, "run");
+      mkdirSync(planDir);
+      const projectsRoot = join(dir, "projects");
+      jsonl(agentPath(projectsRoot, projectSlug(dir), "a"), [
+        announceUser(planDir, "work/01", "dev"),
+        assistant("m", { input_tokens: 11 }),
+      ]);
+      const agents = createTranscriptSource(planDir, projectsRoot, undefined).read();
+      expect(agents).toHaveLength(1);
+      expect(agents[0]!.counts.input).toBe(11);
+    });
+  });
+
+  test("run identity changes invalidate included and excluded cached verdicts", () => {
+    withTempDir((dir) => {
+      const projectsRoot = join(dir, "projects");
+      for (const [id, input] of [["old-id", 3], ["new-id", 7]] as const) {
+        const prompt = announceUser(dir, "work/01", "dev");
+        prompt.message.content += id;
+        jsonl(agentPath(projectsRoot, projectSlug(dir), id), [
+          prompt, assistant("m", { input_tokens: input }),
+        ]);
+      }
+      const source = createTranscriptSource(dir, projectsRoot, dir, "old-id");
+      expect(source.read().map((agent) => agent.counts.input)).toEqual([3]);
+      expect(source.read("new-id").map((agent) => agent.counts.input)).toEqual([7]);
+      expect(source.read("new-id").map((agent) => agent.counts.input)).toEqual([7]);
+      expect(source.read("old-id").map((agent) => agent.counts.input)).toEqual([3]);
+    });
+  });
+
   function setup(): {
     root: string;
     planDir: string;

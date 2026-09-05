@@ -1,10 +1,11 @@
 import {
   existsSync,
+  readFileSync,
   statSync,
   watch as fsWatch,
   type FSWatcher,
 } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { parseLines } from "../../flightplan/scripts/lib/flightlog";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import { aggregateFleet } from "./fleet";
@@ -84,6 +85,15 @@ export function createDebouncer(
   };
 }
 
+function readRunId(planDir: string): string | undefined {
+  try {
+    return readFileSync(join(planDir, "run.id"), "utf8").trim() || undefined;
+  } catch {
+    // A missing or unreadable id means the graph run has not started.
+    return undefined;
+  }
+}
+
 export function eventsHandler(
   request: Request,
   logPath: string,
@@ -111,13 +121,14 @@ export function eventsHandler(
   let cleanupStream = (): void => {};
   // Created once per stream, never per snapshot: its cursors are what make each
   // re-read incremental. Two open tabs get two sources with independent cursors.
+  const repoRoot = options?.repoRoot || repoRootOf(planDir);
   const usageSource =
-    options?.source ?? createTranscriptSource(planDir, options?.projectsRoot);
+    options?.source ??
+    createTranscriptSource(planDir, options?.projectsRoot, repoRoot ?? undefined);
   // The codex side is optional in the same way: a plan with no external engine gets
   // an empty list, and the join then attaches nothing.
   const codexSource =
     options?.codexSource ?? createCodexSource(options?.codexRoot);
-  const repoRoot = repoRootOf(planDir);
 
   // The identities the flightlog still reports running. A driver blocked on the codex
   // CLI writes nothing while it waits, so its own last transcript line lands before the
@@ -133,7 +144,12 @@ export function eventsHandler(
 
   function readAgents(): AgentUsage[] {
     try {
-      const agents = usageSource.read();
+      // run.id lives beside graph.json; the log lives one level below in .flightlog/.
+      const runId = options?.deckSource === "graph"
+        ? readRunId(planDir)
+        : undefined;
+      if (options?.deckSource === "graph" && runId === undefined) return [];
+      const agents = usageSource.read(runId);
       if (repoRoot === null) return agents;
       // Wrapped separately: a codex tree that cannot be read must cost the Claude
       // figures nothing, so its failure falls back to the un-attached agents.
