@@ -7,7 +7,7 @@
 >
 > **Depends on**: skill/01, deck/04, deck/05
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -136,27 +136,27 @@ A reader who follows the walkthrough and sees all five is looking at a working p
 
 ## Acceptance criteria
 
-- [ ] All five example files exist at the paths listed above — the script, the graph, the identifier, the trail, and the README — and the trail is not committed inside a self-ignoring directory.
-- [ ] The graph declares five or six nodes across two or three lanes, with at least one dependency whose two ends sit in different lanes.
-- [ ] The declared lane order is one that alphabetical sorting would change.
-- [ ] The trail produces all five displayed states across the graph's nodes: complete, in flight, blocked, ready, and invalid.
-- [ ] The trail contains at least one score entry and at least one node logged at two different attempt numbers.
-- [ ] The script uses only the workflow globals, imports nothing, and calls no filesystem API.
-- [ ] Every path in every prompt in the script is an absolute literal interpolated into the string, with no shell variable and no relative path.
-- [ ] Every agent prompt opens with an announce command and closes with a completion command carrying identical node, role, and attempt values.
-- [ ] A test loads the committed graph and trail from their committed path and asserts the graph validates with no errors and yields the declared number of nodes.
-- [ ] That test runs the committed trail against the committed graph through the existing derivation and asserts the expected displayed state for **every** node by name, plus the resulting counts. Node count and absence of errors are not enough: an emptied trail still satisfies those, and the fixture's whole value is the states it exercises.
-- [ ] The same test asserts the fleet result for the retry and for the score entry, so a trail that loses either fails rather than passing quietly.
-- [ ] The walkthrough separates looking at the fixture from adapting and running it, and the running list covers the trail reset, a fresh identifier, and the absolute-path substitution.
-- [ ] The example ships a run identifier file, and every prompt the script builds interpolates that same value — asserted by a test that reads both and compares, not by inspection. An example whose prompts omit it teaches the one mistake that silently mixes a previous run's token figures into the current one.
-- [ ] The README's walkthrough gives the placement steps, the exact server command, and a named check plus a named regression symptom for each of the five panels.
+- [x] All five example files exist at the paths listed above — the script, the graph, the identifier, the trail, and the README — and the trail is not committed inside a self-ignoring directory.
+- [x] The graph declares five or six nodes across two or three lanes, with at least one dependency whose two ends sit in different lanes.
+- [x] The declared lane order is one that alphabetical sorting would change.
+- [x] The trail produces all five displayed states across the graph's nodes: complete, in flight, blocked, ready, and invalid.
+- [x] The trail contains at least one score entry and at least one node logged at two different attempt numbers.
+- [x] The script uses only the workflow globals, imports nothing, and calls no filesystem API.
+- [x] Every path in every prompt in the script is an absolute literal interpolated into the string, with no shell variable and no relative path.
+- [x] Every agent prompt opens with an announce command and closes with a completion command carrying identical node, role, and attempt values.
+- [x] A test loads the committed graph and trail from their committed path and asserts the graph validates with no errors and yields the declared number of nodes.
+- [x] That test runs the committed trail against the committed graph through the existing derivation and asserts the expected displayed state for **every** node by name, plus the resulting counts. Node count and absence of errors are not enough: an emptied trail still satisfies those, and the fixture's whole value is the states it exercises.
+- [x] The same test asserts the fleet result for the retry and for the score entry, so a trail that loses either fails rather than passing quietly.
+- [x] The walkthrough separates looking at the fixture from adapting and running it, and the running list covers the trail reset, a fresh identifier, and the absolute-path substitution.
+- [x] The example ships a run identifier file, and every prompt the script builds interpolates that same value — asserted by a test that reads both and compares, not by inspection. An example whose prompts omit it teaches the one mistake that silently mixes a previous run's token figures into the current one.
+- [x] The README's walkthrough gives the placement steps, the exact server command, and a named check plus a named regression symptom for each of the five panels.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/graph-source.test.ts` passes.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes.
-- [ ] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. Typecheck against the root config, never a file list — naming files on the command line drops the config and buries real errors among fake ones. The repo-wide run is not green: 86 pre-existing errors sit elsewhere, so a clean result is an empty grep, not a zero count.
-- [ ] Follow the README's own walkthrough end to end: create a run directory, copy the graph and trail into it, start the dashboard server against it, and confirm each of the five panel checks. Report which checks passed and quote any that did not.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/graph-source.test.ts` passes.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes.
+- [x] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. Typecheck against the root config, never a file list — naming files on the command line drops the config and buries real errors among fake ones. The repo-wide run is not green: 86 pre-existing errors sit elsewhere, so a clean result is an empty grep, not a zero count.
+- [x] Follow the README's own walkthrough end to end: create a run directory, copy the graph and trail into it, start the dashboard server against it, and confirm each of the five panel checks. Report which checks passed and quote any that did not.
 
 ## Eval rubric
 
