@@ -7,7 +7,7 @@
 >
 > **Depends on**: deck/01, deck/03
 > **Blocks**: skill/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -258,49 +258,49 @@ age, and assert the figures are unchanged from today's.
 
 ## Acceptance criteria
 
-- [ ] `createTranscriptSource` accepts an explicit repo root and, when given
+- [x] `createTranscriptSource` accepts an explicit repo root and, when given
       one, resolves the slug directory without calling `repoRootOf`.
-- [ ] An explicit root that sits outside any git repository resolves the
+- [x] An explicit root that sits outside any git repository resolves the
       transcript directory and returns that run's agents.
-- [ ] An explicit root takes precedence over whatever a walk from the run
+- [x] An explicit root takes precedence over whatever a walk from the run
       directory would have found.
-- [ ] With no explicit root, resolution falls back to the walk and behaves
+- [x] With no explicit root, resolution falls back to the walk and behaves
       exactly as before — asserted by a test, not by inspection.
-- [ ] A transcript carrying a previous run id is excluded from the plan totals
+- [x] A transcript carrying a previous run id is excluded from the plan totals
       and from every node's figures; one carrying the current run id is included
       in both.
-- [ ] The graph source with no run id attributes nothing.
-- [ ] The task-file source never applies the check, and its figures are
+- [x] The graph source with no run id attributes nothing.
+- [x] The task-file source never applies the check, and its figures are
       identical to today's even when a run id file is present in the directory —
       asserted by a test, since this is the silent regression path.
-- [ ] The branch reads the deck-source field and never infers the source from a
+- [x] The branch reads the deck-source field and never infers the source from a
       file's presence, and the existing transcript-reader injection point is
       unchanged.
-- [ ] On one live connection, an identifier appearing where there was none, and
+- [x] On one live connection, an identifier appearing where there was none, and
       an identifier changing to another, both take effect on the next snapshot
       rather than persisting the previous verdicts.
-- [ ] The reason identity is used rather than an elapsed-time window is recorded
+- [x] The reason identity is used rather than an elapsed-time window is recorded
       where the check lives.
-- [ ] An explicit root whose **computed transcript directory** does not exist
+- [x] An explicit root whose **computed transcript directory** does not exist
       returns an empty list rather than throwing.
-- [ ] An explicit root naming a repository directory that no longer exists, but
+- [x] An explicit root naming a repository directory that no longer exists, but
       whose computed transcript directory is still present, still returns those
       transcripts. The root is a key for computing the project slug, not a path
       that has to be on disk — adding an existence check on it would silently
       lose readable usage for a repo the user has since deleted or moved.
-- [ ] `eventsHandler` accepts an optional repo root and uses that one value both
+- [x] `eventsHandler` accepts an optional repo root and uses that one value both
       for the transcript source and for the codex join, so external-engine usage
       is no longer dropped when the run directory is outside a repository.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/usage-source.test.ts`
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/usage-source.test.ts`
       passes.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/events-api.test.ts`
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/events-api.test.ts`
       passes.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes — the whole
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes — the whole
       autopilot suite, to catch a regression in a neighbouring consumer.
-- [ ] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. Run the
+- [x] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. Run the
       typecheck against the root `tsconfig.json` with no file list. The
       repo-wide run is **not** green — 86 pre-existing errors sit outside this
       plan — so a zero total is not the bar; an empty grep for these paths is.

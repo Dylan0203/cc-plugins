@@ -7,7 +7,7 @@
 >
 > **Depends on**: deck/03
 > **Blocks**: skill/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -141,22 +141,22 @@ Cover:
 
 ## Acceptance criteria
 
-- [ ] `layoutGraph` accepts a road order through its options object and uses it verbatim when non-empty.
-- [ ] A declared order that is not alphabetical survives to the rendered road sequence.
-- [ ] A declared lane with no nodes is drawn as a road with no berths.
-- [ ] A node whose bucket is not declared is drawn on a road appended after the declared ones, never dropped.
-- [ ] With no road order supplied, the layout is identical to today's, asserted by a test.
-- [ ] The caller supplies a road order only when the payload's `deckSource` field says the graph source, and a task-tree payload carrying an empty bucket renders today's road set — asserted at the caller, not only at the layout function.
-- [ ] The road order is part of the redraw key, and both call sites supply the same list.
-- [ ] The stale comment claiming the roads arrive pre-sorted is corrected.
-- [ ] No visual token, shape, or geometry constant changes.
+- [x] `layoutGraph` accepts a road order through its options object and uses it verbatim when non-empty.
+- [x] A declared order that is not alphabetical survives to the rendered road sequence.
+- [x] A declared lane with no nodes is drawn as a road with no berths.
+- [x] A node whose bucket is not declared is drawn on a road appended after the declared ones, never dropped.
+- [x] With no road order supplied, the layout is identical to today's, asserted by a test.
+- [x] The caller supplies a road order only when the payload's `deckSource` field says the graph source, and a task-tree payload carrying an empty bucket renders today's road set — asserted at the caller, not only at the layout function.
+- [x] The road order is part of the redraw key, and both call sites supply the same list.
+- [x] The stale comment claiming the roads arrive pre-sorted is corrected.
+- [x] No visual token, shape, or geometry constant changes.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/graph.test.js` passes.
-- [ ] `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/` passes.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/` passes — the server side is untouched and must stay so.
-- [ ] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. The repo-wide run is not green — 86 pre-existing errors sit elsewhere — so a clean result means these paths print nothing, not that the count is zero.
+- [x] `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/graph.test.js` passes.
+- [x] `bun test packages/dispatch/skills/autopilot/dashboard/dist/modules/` passes.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/` passes — the server side is untouched and must stay so.
+- [x] `bunx --bun tsc --noEmit | grep packages/dispatch` prints nothing. The repo-wide run is not green — 86 pre-existing errors sit elsewhere — so a clean result means these paths print nothing, not that the count is zero.
 
 ## Eval rubric
 
