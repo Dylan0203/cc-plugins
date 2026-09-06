@@ -1243,6 +1243,21 @@ button {
   color: var(--state-blocked);
 }
 
+/* Quiet on purpose: no border, no uppercase, muted ink — the eye lands on role,
+   then model, then tokens, and a chip competing with .role-badge would reverse that. */
+.role-model {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+}
+
+/* The same vendor accent the codex token figure would carry if tiers didn't own its
+   ink — see the comment on .role-tokens.-codex. The model chip has no tier to defer
+   to, so it takes that accent directly. */
+.role-model.-codex {
+  color: var(--token-codex);
+}
+
 /* The message is where a rejected gate says WHY, so it stops being secondary. */
 .fleet-row.-rejected .fleet-cell.-message {
   color: var(--text);

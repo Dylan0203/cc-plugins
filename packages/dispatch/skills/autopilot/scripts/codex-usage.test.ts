@@ -45,6 +45,12 @@ const tokenCount = (usage: Record<string, number>) => ({
   payload: { type: "token_count", info: { total_token_usage: usage } },
 });
 
+const turnContext = (model: string) => ({
+  timestamp: "2026-08-29T08:30:30.000Z",
+  type: "turn_context",
+  payload: { model },
+});
+
 // The real shape, from a rollout on disk. `input_tokens` already contains
 // `cached_input_tokens`, and `total_tokens` is input+output — so a mapper that adds the
 // fields it is handed reports roughly double what codex actually billed.
@@ -149,6 +155,25 @@ describe("createCodexSource", () => {
     expect(run!.relayDir).toBe("20260829-164034-617-28486-7d4298ab");
   });
 
+  test("reads the model off a turn_context payload, absent from session_meta", () => {
+    const root = mkdtempSync(join(tmpdir(), "codex-"));
+    writeRollout(root, "rollout-a.jsonl", [
+      meta("/repo"),
+      turnContext("gpt-6-astra"),
+    ]);
+
+    const [run] = createCodexSource(root).read();
+    expect(run!.model).toBe("gpt-6-astra");
+  });
+
+  test("has no model when the rollout carries no turn_context line", () => {
+    const root = mkdtempSync(join(tmpdir(), "codex-"));
+    writeRollout(root, "rollout-a.jsonl", [meta("/repo")]);
+
+    const [run] = createCodexSource(root).read();
+    expect(run!.model).toBeNull();
+  });
+
   test("a second pass over an unchanged tree reports the same totals", () => {
     const root = mkdtempSync(join(tmpdir(), "codex-"));
     writeRollout(root, "rollout-a.jsonl", [
@@ -170,6 +195,7 @@ describe("attachCodexUsage", () => {
     startedAt: "2026-08-29T08:30:00.000Z",
     relayDir: null,
     originator: "codex_exec",
+    model: null,
     counts: { input: 0, output: 0, cacheRead: 0, cacheWrite: 5000 },
     ...overrides,
   });
@@ -325,5 +351,42 @@ describe("attachCodexUsage", () => {
 
     expect(driver!.counts.cacheWrite).toBe(1000);
     expect(agents[0]!.codexCounts).toBeUndefined(); // input not mutated
+  });
+
+  test("carries a run's model onto the driver's codexModels", () => {
+    const [driver] = attachCodexUsage(
+      [agent({ file: "/a1.jsonl", externalDriver: true })],
+      [run({ model: "gpt-6-astra" })],
+      "/repo",
+    );
+    expect(driver!.codexModels).toEqual(["gpt-6-astra"]);
+  });
+
+  test("dedupes and preserves first-seen order across several codex runs", () => {
+    const attached = attachCodexUsage(
+      [
+        agent({
+          file: "/a1.jsonl",
+          relayDirs: ["dir-1", "dir-2", "dir-3"],
+          externalDriver: true,
+        }),
+      ],
+      [
+        run({ relayDir: "dir-1", model: "gpt-6-astra" }),
+        run({ relayDir: "dir-2", model: "gpt-5" }),
+        run({ relayDir: "dir-3", model: "gpt-6-astra" }),
+      ],
+      "/repo",
+    );
+    expect(attached[0]!.codexModels).toEqual(["gpt-6-astra", "gpt-5"]);
+  });
+
+  test("a run with no model leaves codexModels absent, never an empty array", () => {
+    const [driver] = attachCodexUsage(
+      [agent({ file: "/a1.jsonl", externalDriver: true })],
+      [run({})],
+      "/repo",
+    );
+    expect(driver!.codexModels).toBeUndefined();
   });
 });

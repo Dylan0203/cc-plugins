@@ -241,24 +241,64 @@ describe("eventsHandler transcript membership", () => {
     const projectsRoot = join(root, "projects");
     mkdirSync(planDir);
     const logPath = join(planDir, "run.jsonl");
-    writeFileSync(logPath, [entry, { ...entry, task: "server/06" }].map((item) => JSON.stringify(item)).join("\n") + "\n");
-    for (const [id, input] of [["old-id", 3], ["new-id", 7]] as const) {
-      const file = join(projectsRoot, projectSlug(repoRoot), "session", "subagents", "workflows", "wf_1", `agent-${id}.jsonl`);
+    writeFileSync(
+      logPath,
+      [entry, { ...entry, task: "server/06" }]
+        .map((item) => JSON.stringify(item))
+        .join("\n") + "\n",
+    );
+    for (const [id, input] of [
+      ["old-id", 3],
+      ["new-id", 7],
+    ] as const) {
+      const file = join(
+        projectsRoot,
+        projectSlug(repoRoot),
+        "session",
+        "subagents",
+        "workflows",
+        "wf_1",
+        `agent-${id}.jsonl`,
+      );
       mkdirSync(dirname(file), { recursive: true });
-      writeFileSync(file, [
-        { type: "user", timestamp: entry.ts, message: { content: `${planDir}/run.jsonl --task ${id === "old-id" ? "server/06" : "server/05"} --role dev run ${id} codex-run.ts` } },
-        { type: "assistant", timestamp: entry.ts, message: { model: "m", usage: { input_tokens: input } } },
-      ].map((record) => JSON.stringify(record)).join("\n") + "\n");
+      writeFileSync(
+        file,
+        [
+          {
+            type: "user",
+            timestamp: entry.ts,
+            message: {
+              content: `${planDir}/run.jsonl --task ${id === "old-id" ? "server/06" : "server/05"} --role dev run ${id} codex-run.ts`,
+            },
+          },
+          {
+            type: "assistant",
+            timestamp: entry.ts,
+            message: { model: "m", usage: { input_tokens: input } },
+          },
+        ]
+          .map((record) => JSON.stringify(record))
+          .join("\n") + "\n",
+      );
     }
     return { root, planDir, repoRoot, projectsRoot, logPath };
   }
 
-  function connect(f: ReturnType<typeof fixture>, options: NonNullable<Parameters<typeof eventsHandler>[3]> = {}) {
+  function connect(
+    f: ReturnType<typeof fixture>,
+    options: NonNullable<Parameters<typeof eventsHandler>[3]> = {},
+  ) {
     const controller = new AbortController();
     const response = eventsHandler(
       new Request("http://localhost/api/events", { signal: controller.signal }),
-      f.logPath, f.planDir,
-      { repoRoot: f.repoRoot, projectsRoot: f.projectsRoot, codexSource: { read: () => [] }, ...options },
+      f.logPath,
+      f.planDir,
+      {
+        repoRoot: f.repoRoot,
+        projectsRoot: f.projectsRoot,
+        codexSource: { read: () => [] },
+        ...options,
+      },
     );
     const reader = response.body!.getReader();
     return {
@@ -272,7 +312,11 @@ describe("eventsHandler transcript membership", () => {
     };
   }
 
-  function expectUsage(snapshot: FleetSnapshot, input: number, agentCount: number) {
+  function expectUsage(
+    snapshot: FleetSnapshot,
+    input: number,
+    agentCount: number,
+  ) {
     expect(snapshot.usage.totals).toEqual(counts(input));
     expect(snapshot.usage.agentCount).toBe(agentCount);
     const byTask: Record<string, TokenCounts> = {};
@@ -281,22 +325,38 @@ describe("eventsHandler transcript membership", () => {
     if (input === 10 && agentCount === 1) byTask["server/05"] = counts(10);
     expect(snapshot.usage.byTask).toEqual(byTask);
     expect(snapshot.rows).toHaveLength(2);
-    for (const row of snapshot.rows) expect(row.usage).toEqual(row.ref === undefined ? undefined : byTask[row.ref]);
+    for (const row of snapshot.rows)
+      expect(row.usage).toEqual(
+        row.ref === undefined ? undefined : byTask[row.ref],
+      );
   }
 
   test("uses the declared root for transcript discovery and the codex cwd join", async () => {
     const f = fixture();
     const stream = connect(f, {
-      codexSource: { read: () => [{
-        file: "/rollout.jsonl", cwd: f.repoRoot, startedAt: entry.ts,
-        relayDir: null, originator: "codex_exec", counts: counts(42),
-      }] },
+      codexSource: {
+        read: () => [
+          {
+            file: "/rollout.jsonl",
+            cwd: f.repoRoot,
+            startedAt: entry.ts,
+            relayDir: null,
+            originator: "codex_exec",
+            model: null,
+            counts: counts(42),
+          },
+        ],
+      },
     });
     try {
       const snapshot = await stream.read();
       expectUsage(snapshot, 10, 2);
       expect(snapshot.usage.codexTotals).toEqual(counts(42));
-      expect(snapshot.rows.filter((row) => row.codexUsage).map((row) => row.codexUsage)).toEqual([counts(42)]);
+      expect(
+        snapshot.rows
+          .filter((row) => row.codexUsage)
+          .map((row) => row.codexUsage),
+      ).toEqual([counts(42)]);
     } finally {
       await stream.close();
       rmSync(f.root, { recursive: true, force: true });
@@ -307,7 +367,12 @@ describe("eventsHandler transcript membership", () => {
     const f = fixture();
     const logPath = join(f.planDir, ".flightlog", "run.jsonl");
     mkdirSync(dirname(logPath), { recursive: true });
-    writeFileSync(logPath, [entry, { ...entry, task: "server/06" }].map((item) => JSON.stringify(item)).join("\n") + "\n");
+    writeFileSync(
+      logPath,
+      [entry, { ...entry, task: "server/06" }]
+        .map((item) => JSON.stringify(item))
+        .join("\n") + "\n",
+    );
     // Production keeps run.id beside graph.json, one level above the flightlog.
     writeFileSync(join(f.planDir, "run.id"), "new-id\n");
     const stream = connect({ ...f, logPath }, { deckSource: "graph" });
@@ -336,18 +401,21 @@ describe("eventsHandler transcript membership", () => {
     }
   }, 12_000);
 
-  test.each(["", "   \n", "directory"])("graph with absent content (%j) attributes nothing", async (content) => {
-    const f = fixture();
-    if (content === "directory") mkdirSync(join(f.planDir, "run.id"));
-    else writeFileSync(join(f.planDir, "run.id"), content);
-    const stream = connect(f, { deckSource: "graph" });
-    try {
-      expectUsage(await stream.read(), 0, 0);
-    } finally {
-      await stream.close();
-      rmSync(f.root, { recursive: true, force: true });
-    }
-  });
+  test.each(["", "   \n", "directory"])(
+    "graph with absent content (%j) attributes nothing",
+    async (content) => {
+      const f = fixture();
+      if (content === "directory") mkdirSync(join(f.planDir, "run.id"));
+      else writeFileSync(join(f.planDir, "run.id"), content);
+      const stream = connect(f, { deckSource: "graph" });
+      try {
+        expectUsage(await stream.read(), 0, 0);
+      } finally {
+        await stream.close();
+        rmSync(f.root, { recursive: true, force: true });
+      }
+    },
+  );
 
   test("tasks and the default source ignore run.id and preserve every figure", async () => {
     const f = fixture();
@@ -358,8 +426,11 @@ describe("eventsHandler transcript membership", () => {
       writeFileSync(join(f.planDir, "run.id"), "new-id");
       for (const deckSource of ["tasks", undefined] as const) {
         const after = connect(f, { deckSource });
-        try { expect(await after.read()).toEqual(baseline); }
-        finally { await after.close(); }
+        try {
+          expect(await after.read()).toEqual(baseline);
+        } finally {
+          await after.close();
+        }
       }
     } finally {
       await before.close();
@@ -371,9 +442,15 @@ describe("eventsHandler transcript membership", () => {
     const f = fixture();
     writeFileSync(join(f.planDir, "run.id"), "new-id");
     const ids: Array<string | undefined> = [];
-    const stream = connect(f, { deckSource: "graph", source: {
-      read(runId?: string) { ids.push(runId); return [agent()]; },
-    } });
+    const stream = connect(f, {
+      deckSource: "graph",
+      source: {
+        read(runId?: string) {
+          ids.push(runId);
+          return [agent()];
+        },
+      },
+    });
     try {
       expectUsage(await stream.read(), 10, 1);
       expect(ids).toEqual(["new-id"]);

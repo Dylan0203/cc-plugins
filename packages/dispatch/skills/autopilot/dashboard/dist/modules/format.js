@@ -377,6 +377,31 @@ export function renderRubric(score) {
     <div class="rationale">${renderRationale(rationale)}</div>`;
 }
 
+// The reader wants which tier, not which build — a raw id carries version and
+// date noise the chip has no room for. A family match anywhere in the id (not
+// just as a prefix) survives the `claude-3-5-sonnet` and `claude-sonnet-5` shapes
+// alike. An id from no known family still renders via the dash-to-space fallback,
+// because a silent blank would read as "no model", a different fact entirely.
+const CLAUDE_FAMILIES = ["opus", "sonnet", "haiku"];
+
+export function formatModel(id) {
+  const raw = String(id ?? "");
+  const family = CLAUDE_FAMILIES.find((name) => raw.includes(name));
+  return family ?? raw.replaceAll("-", " ");
+}
+
+// Format first, then dedupe: claude-opus-5 and claude-opus-5-1 both become "opus"
+// before comparison, so the chip shows one badge, not two identical-looking ones.
+export function formatModelList(ids) {
+  if (!ids || !ids.length) return "";
+  const labels = [];
+  for (const id of ids) {
+    const label = formatModel(id);
+    if (!labels.includes(label)) labels.push(label);
+  }
+  return labels.join(" / ");
+}
+
 /** Bucket, then task number read as a number, then ref. The lanes and the graph share it. */
 export function compareTaskOrder(left, right) {
   return (

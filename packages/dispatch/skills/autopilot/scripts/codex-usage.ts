@@ -31,6 +31,8 @@ export type CodexRun = {
    * `attachCodexUsage`. Null when the meta line is missing.
    */
   originator: string | null;
+  /** Model id from the run's `turn_context` payload. Null when the rollout has none. */
+  model: string | null;
   counts: ReturnType<typeof emptyCounts>;
 };
 
@@ -93,6 +95,7 @@ type FileState = {
   startedAt: string | null;
   relayDir: string | null;
   originator: string | null;
+  model: string | null;
   counts: ReturnType<typeof emptyCounts>;
 };
 
@@ -105,6 +108,7 @@ function freshState(): FileState {
     startedAt: null,
     relayDir: null,
     originator: null,
+    model: null,
     counts: emptyCounts(),
   };
 }
@@ -175,6 +179,13 @@ function ingestLine(state: FileState, rawLine: string): void {
     if (match) state.relayDir = match[1]!;
   }
 
+  // `session_meta` carries no model key — verified against real rollouts. The model
+  // lives on `turn_context`, one per turn; the first is enough, so later ones are
+  // left alone rather than overwritten (a mid-run model switch is not modelled here).
+  if (state.model === null && record.type === "turn_context" && payload) {
+    if (typeof payload.model === "string") state.model = payload.model;
+  }
+
   // Cumulative, not incremental: every token_count line restates the run's whole spend,
   // so the last one wins outright. Adding them would multiply the run by its turn count.
   if (record.type === "event_msg" && payload?.type === "token_count") {
@@ -203,6 +214,7 @@ function processFile(file: string, state: FileState, size: number): void {
     state.startedAt = null;
     state.relayDir = null;
     state.originator = null;
+    state.model = null;
     state.counts = emptyCounts();
   }
 
@@ -256,6 +268,7 @@ export function createCodexSource(sessionsRoot?: string): CodexSource {
           startedAt: state.startedAt,
           relayDir: state.relayDir,
           originator: state.originator,
+          model: state.model,
           counts: { ...state.counts },
         });
       }
@@ -343,6 +356,10 @@ export function attachCodexUsage(
   const attach = (agent: (typeof folded)[number], run: CodexRun): void => {
     const into = (agent.codexCounts ??= emptyCounts());
     addCounts(into, run.counts);
+    if (run.model !== null) {
+      const models = (agent.codexModels ??= []);
+      if (!models.includes(run.model)) models.push(run.model);
+    }
   };
 
   const byRelayDir = new Map<string, (typeof folded)[number]>();

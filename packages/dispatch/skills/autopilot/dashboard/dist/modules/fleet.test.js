@@ -635,3 +635,72 @@ describe("Tokens under the role chip", () => {
     expect(headerCount).toBe(cellCount);
   });
 });
+
+describe("Model chip under the role chip", () => {
+  test("renders the Claude family word, before the token chip", () => {
+    const html = rowHtml({
+      key: "dev:ui/01#1",
+      role: "dev",
+      ref: "ui/01",
+      status: "finished",
+      models: ["claude-opus-5"],
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 8_000 },
+    });
+
+    expect(html).toContain(
+      '<span class="role-model" title="claude-opus-5">opus</span><span class="role-tokens',
+    );
+  });
+
+  test("renders the codex chip with the -codex class, before the codex token chip", () => {
+    const html = rowHtml({
+      key: "dev:ui/01#1",
+      role: "dev",
+      ref: "ui/01",
+      status: "finished",
+      codexUsage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 54_800 },
+      codexModels: ["gpt-6-astra"],
+    });
+
+    expect(html).toContain(
+      '<span class="role-model -codex" title="gpt-6-astra">gpt 6 astra</span><span class="role-tokens -codex',
+    );
+  });
+
+  // Format first, then dedupe: two builds of the same family read as one chip.
+  test("dedupes several raw ids into one chip and carries all of them in the title", () => {
+    const html = rowHtml({
+      key: "dev:ui/01#1",
+      role: "dev",
+      ref: "ui/01",
+      status: "finished",
+      models: ["claude-opus-5", "claude-opus-5-1"],
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    });
+
+    expect(html).toContain(
+      '<span class="role-model" title="claude-opus-5, claude-opus-5-1">opus</span>',
+    );
+  });
+
+  test("renders nothing at all when the list is absent or empty", () => {
+    const absent = rowHtml({
+      key: "dev:ui/01#1",
+      role: "dev",
+      ref: "ui/01",
+      status: "finished",
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    });
+    const empty = rowHtml({
+      key: "dev:ui/01#1",
+      role: "dev",
+      ref: "ui/01",
+      status: "finished",
+      models: [],
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    });
+
+    expect(absent).not.toContain("role-model");
+    expect(empty).not.toContain("role-model");
+  });
+});

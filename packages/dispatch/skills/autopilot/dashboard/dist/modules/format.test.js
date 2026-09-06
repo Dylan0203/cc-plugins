@@ -3,6 +3,8 @@ import {
   TOKEN_DANGER,
   TOKEN_WARN,
   allHarnessTokens,
+  formatModel,
+  formatModelList,
   formatTokens,
   freshTokens,
   hasTokenReading,
@@ -292,5 +294,45 @@ describe("renderRationale", () => {
   test("renders nothing for an absent rationale", () => {
     expect(renderRationale(undefined)).toBe("");
     expect(renderRationale("")).toBe("");
+  });
+});
+
+describe("formatModel", () => {
+  test("renders each Claude family as its bare family word", () => {
+    expect(formatModel("claude-opus-5")).toBe("opus");
+    expect(formatModel("claude-haiku-4-5-20251001")).toBe("haiku");
+    expect(formatModel("claude-sonnet-5")).toBe("sonnet");
+  });
+
+  test("turns dashes to spaces for any other id", () => {
+    expect(formatModel("gpt-6-astra")).toBe("gpt 6 astra");
+  });
+
+  // A silent blank would read as "no model", a different fact than an id from
+  // an unlisted family — it must still print something, never vanish.
+  test("falls back to dash-to-space for an id matching no known family", () => {
+    expect(formatModel("mystery-model-9")).toBe("mystery model 9");
+  });
+});
+
+describe("formatModelList", () => {
+  test("formats then dedupes so near-identical ids collapse to one chip", () => {
+    expect(formatModelList(["claude-opus-5", "claude-opus-5-1"])).toBe("opus");
+  });
+
+  test("joins distinct labels with a slash", () => {
+    expect(formatModelList(["claude-opus-5", "claude-sonnet-5"])).toBe(
+      "opus / sonnet",
+    );
+  });
+
+  test("formats a codex id through the same dash-to-space fallback", () => {
+    expect(formatModelList(["gpt-6-astra"])).toBe("gpt 6 astra");
+  });
+
+  test("renders nothing for an absent or empty list", () => {
+    expect(formatModelList(undefined)).toBe("");
+    expect(formatModelList(null)).toBe("");
+    expect(formatModelList([])).toBe("");
   });
 });

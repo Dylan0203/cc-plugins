@@ -1,6 +1,7 @@
 import {
   escapeHtml,
   formatDuration,
+  formatModelList,
   formatScore,
   formatTokens,
   freshTokens,
@@ -60,20 +61,30 @@ function tokenTitle(usage) {
 // column for "which agent is expensive", and a second scale in that column would mean
 // two ambers stood for two different amounts. The `cdx` prefix carries the vendor, so
 // the colour is free to carry the budget.
-function renderCodexTokens(codexUsage) {
+// Absent or empty renders nothing, same rule as the token chip beside it — a row
+// no transcript matched gets no model reading either. The title carries the raw
+// ids the deduped label folded together, for the one reader who wants the build.
+function renderModelChip(models, codexClass) {
+  const label = formatModelList(models);
+  if (!label) return "";
+  const title = escapeHtml(models.join(", "));
+  return `<span class="role-model${codexClass}" title="${title}">${escapeHtml(label)}</span>`;
+}
+
+function renderCodexTokens(codexUsage, codexModels) {
   if (!codexUsage) return "";
   const fresh = freshTokens(codexUsage);
   const tier = tokenTier(fresh);
   const title = `codex — fresh ${codexUsage.cacheWrite} · cache read ${codexUsage.cacheRead} · output ${codexUsage.output}`;
-  return `<span class="role-tokens -codex${tier ? ` ${tier}` : ""}" title="${escapeHtml(title)}">cdx ${escapeHtml(formatTokens(fresh))}</span>`;
+  return `${renderModelChip(codexModels, " -codex")}<span class="role-tokens -codex${tier ? ` ${tier}` : ""}" title="${escapeHtml(title)}">cdx ${escapeHtml(formatTokens(fresh))}</span>`;
 }
 
-function renderTokens(usage, codexUsage) {
+function renderTokens(usage, codexUsage, models, codexModels) {
   const fresh = freshTokens(usage);
   // An unmeasured count carries no tier, so it gets no class rather than an
   // empty one — the CSS reads the absence, and the markup stays legible.
   const tier = tokenTier(fresh);
-  return `<span class="role-tokens${tier ? ` ${tier}` : ""}" title="${escapeHtml(tokenTitle(usage))}">${escapeHtml(formatTokens(fresh))}</span>${renderCodexTokens(codexUsage)}`;
+  return `${renderModelChip(models, "")}<span class="role-tokens${tier ? ` ${tier}` : ""}" title="${escapeHtml(tokenTitle(usage))}">${escapeHtml(formatTokens(fresh))}</span>${renderCodexTokens(codexUsage, codexModels)}`;
 }
 
 // A leading PASS / FAIL is structure, not prose — agents write it on nearly every
@@ -167,7 +178,7 @@ function renderRow(row, nowMs) {
       data-row-key="${escapeHtml(row.key)}"${ticking} tabindex="${expandable ? "0" : "-1"}"
       aria-expanded="${expandable ? expandedRows.has(row.key) : false}">
       <span class="fleet-cell -status" role="cell"><span class="fleet-status" aria-label="${inFlight ? "in flight" : hardFailed ? "hard failed" : rejected ? "did not pass" : abandoned ? "no end reported" : "finished"}"></span></span>
-      <span class="fleet-cell -role" role="cell"><span class="role-badge">${escapeHtml(row.role)}</span>${renderTokens(row.usage, row.codexUsage)}${unknownLabel}</span>
+      <span class="fleet-cell -role" role="cell"><span class="role-badge">${escapeHtml(row.role)}</span>${renderTokens(row.usage, row.codexUsage, row.models, row.codexModels)}${unknownLabel}</span>
       <span class="fleet-cell -ref" role="cell">${escapeHtml(row.ref)}</span>
       <span class="fleet-cell -attempt" role="cell">${row.attempt === undefined ? "" : escapeHtml(row.attempt)}</span>
       <span class="fleet-cell -elapsed" role="cell">${elapsed}</span>

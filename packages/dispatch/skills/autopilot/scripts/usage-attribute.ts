@@ -179,6 +179,8 @@ export function attributeUsage(
   // Separate map, not a field on the one above: a row can have Claude usage and no
   // codex run, and the two absences must stay independently expressible.
   const codexByRow = new Map<FleetRow, TokenCounts>();
+  const modelsByRow = new Map<FleetRow, string[]>();
+  const codexModelsByRow = new Map<FleetRow, string[]>();
 
   for (const [identity, groupRows] of rowGroups) {
     const groupAgents = agentGroups.get(identity);
@@ -189,16 +191,24 @@ export function attributeUsage(
       const agent = groupAgents[agentIndex]!;
       usageByRow.set(row, agent.counts);
       if (agent.codexCounts) codexByRow.set(row, agent.codexCounts);
+      if (agent.models.length > 0) modelsByRow.set(row, agent.models);
+      if (agent.codexModels && agent.codexModels.length > 0) {
+        codexModelsByRow.set(row, agent.codexModels);
+      }
     }
   }
 
   const newRows = rows.map((row) => {
     const usage = usageByRow.get(row);
     const codexUsage = codexByRow.get(row);
+    const models = modelsByRow.get(row);
+    const codexModels = codexModelsByRow.get(row);
     return {
       ...row,
       ...(usage === undefined ? {} : { usage }),
       ...(codexUsage === undefined ? {} : { codexUsage }),
+      ...(models === undefined ? {} : { models }),
+      ...(codexModels === undefined ? {} : { codexModels }),
     };
   });
 

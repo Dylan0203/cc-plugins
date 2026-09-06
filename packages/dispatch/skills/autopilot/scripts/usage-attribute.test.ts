@@ -91,6 +91,53 @@ describe("attributeUsage — pairing", () => {
     expect(outRows[0]!.usage).toEqual(counts(5, 6, 7, 8));
   });
 
+  test("carries a paired agent's models onto the row", () => {
+    const rows = [
+      row({
+        key: "dev:work/01#1",
+        ref: "work/01",
+        role: "dev",
+        attempt: 1,
+        startedAt: "2026-08-28T00:00:00.000Z",
+      }),
+    ];
+    const agents = [
+      agent({
+        file: "/a1.jsonl",
+        task: "work/01",
+        role: "dev",
+        attempt: 1,
+        models: ["claude-sonnet-4-5", "claude-haiku-4-5"],
+        codexModels: ["gpt-6-astra"],
+      }),
+    ];
+
+    const { rows: outRows } = attributeUsage(rows, agents);
+
+    expect(outRows[0]!.models).toEqual([
+      "claude-sonnet-4-5",
+      "claude-haiku-4-5",
+    ]);
+    expect(outRows[0]!.codexModels).toEqual(["gpt-6-astra"]);
+  });
+
+  test("an unpaired row's models and codexModels are absent, never an empty array", () => {
+    const rows = [
+      row({
+        key: "r1",
+        ref: "ghost",
+        role: "dev",
+        attempt: 1,
+        startedAt: "2026-08-28T00:00:00.000Z",
+      }),
+    ];
+    const { rows: outRows } = attributeUsage(rows, []);
+    expect(outRows[0]!.models).toBeUndefined();
+    expect(outRows[0]!.codexModels).toBeUndefined();
+    expect("models" in outRows[0]!).toBe(false);
+    expect("codexModels" in outRows[0]!).toBe(false);
+  });
+
   test("does not pair rows and agents of different identities", () => {
     const rows = [
       row({

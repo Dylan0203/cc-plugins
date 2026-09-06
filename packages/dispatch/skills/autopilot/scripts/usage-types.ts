@@ -78,6 +78,12 @@ export type AgentUsage = {
    * measured "codex did nothing".
    */
   codexCounts?: TokenCounts;
+  /**
+   * Every codex model that produced a run this agent drove, in first-seen order,
+   * deduplicated. Absent (never an empty array) for an agent that drove no external
+   * CLI — matching the absent-not-empty rule `codexCounts` already follows.
+   */
+  codexModels?: string[];
 };
 
 /** Plan-wide usage, addressed by task and in aggregate. */
