@@ -1,5 +1,18 @@
 # Changelog
 
+## [dispatch 3.26.0] - 2026-09-06
+
+_tracks tag `dispatch-v3.26.0`_
+
+### Added
+- New `deckplan` skill: a reference-only guide for authoring flightdeck Workflow scripts, including nine authoring rules, a normative graph-contract spec, and a five-task example walkthrough covering all task states.
+- flightdeck now accepts graph-based Workflow plans (`graph.json`) alongside the existing task-tree layout, auto-detecting which shape a given run uses.
+- flightlog gained a `state` command to declare a task's final state (done/blocked/failed) directly, independent of score/note tracking.
+- Autopilot's dashboard now preserves your declared lane order for graph-based plans instead of always sorting lanes alphabetically.
+
+### Fixed
+- Autopilot's transcript-based token attribution now correctly matches transcripts stored outside the git repo (e.g. under `~/.local/share/q-lab`), and updates live when a run's graph changes.
+
 ## [herdr 0.7.2] - 2026-09-05
 
 _tracks tag `herdr-v0.7.2`_
