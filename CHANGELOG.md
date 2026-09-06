@@ -1,5 +1,15 @@
 # Changelog
 
+## [dispatch 3.26.1] - 2026-09-06
+
+_tracks tag `dispatch-v3.26.1`_
+
+### Added
+- Flightdeck's fleet panel now shows which model produced each agent row: a Claude row shows the family name (opus, sonnet, haiku), and a codex row shows its engine id with dashes turned to spaces (e.g. `gpt 6 astra`). Previously a row showed only a token figure, so an expensive row gave no clue which engine burned it.
+
+### Changed
+- The fleet panel's role cell is now a two-column table pairing each engine with its own spend, instead of a single stack of lines — a Claude row shrinks from three lines to two, a codex row from five to three, and the redundant `cdx` prefix is gone since the engine name now sits right beside its figure. A codex run whose rollout reports no model now labels that line `codex` instead of leaving the figure unattributed.
+
 ## [dispatch 3.26.0] - 2026-09-06
 
 _tracks tag `dispatch-v3.26.0`_
