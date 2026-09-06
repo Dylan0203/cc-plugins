@@ -59,15 +59,20 @@ function tokenTitle(usage) {
 //
 // Tiered on the same thresholds as the Claude figure: the reader is scanning one
 // column for "which agent is expensive", and a second scale in that column would mean
-// two ambers stood for two different amounts. The `cdx` prefix carries the vendor, so
-// the colour is free to carry the budget.
-// Absent or empty renders nothing, same rule as the token chip beside it — a row
-// no transcript matched gets no model reading either. The title carries the raw
-// ids the deduped label folded together, for the one reader who wants the build.
-function renderModelChip(models, codexClass) {
-  const label = formatModelList(models);
+// two ambers stood for two different amounts. The model name in the column beside it
+// carries the vendor, so the colour is free to carry the budget.
+//
+// The cell lays these out as a two-column table — model, then its own spend — so the
+// chip and the figure beside it are one line about one engine. `fallback` is what that
+// line is called when no model was measured: the Claude line simply has no name to give
+// and renders nothing, but a codex line must still say `codex`, or its figure sits in a
+// bare column with nothing marking whose spend it is.
+// The title carries the raw ids the deduped label folded together, for the one reader
+// who wants the build.
+function renderModelChip(models, codexClass, fallback = "") {
+  const label = formatModelList(models) || fallback;
   if (!label) return "";
-  const title = escapeHtml(models.join(", "));
+  const title = escapeHtml(models?.length ? models.join(", ") : label);
   return `<span class="role-model${codexClass}" title="${title}">${escapeHtml(label)}</span>`;
 }
 
@@ -76,7 +81,7 @@ function renderCodexTokens(codexUsage, codexModels) {
   const fresh = freshTokens(codexUsage);
   const tier = tokenTier(fresh);
   const title = `codex — fresh ${codexUsage.cacheWrite} · cache read ${codexUsage.cacheRead} · output ${codexUsage.output}`;
-  return `${renderModelChip(codexModels, " -codex")}<span class="role-tokens -codex${tier ? ` ${tier}` : ""}" title="${escapeHtml(title)}">cdx ${escapeHtml(formatTokens(fresh))}</span>`;
+  return `${renderModelChip(codexModels, " -codex", "codex")}<span class="role-tokens -codex${tier ? ` ${tier}` : ""}" title="${escapeHtml(title)}">${escapeHtml(formatTokens(fresh))}</span>`;
 }
 
 function renderTokens(usage, codexUsage, models, codexModels) {

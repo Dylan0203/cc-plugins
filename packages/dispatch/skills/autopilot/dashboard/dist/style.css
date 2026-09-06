@@ -1033,10 +1033,17 @@ button {
 
 .c-fleet {
   /* Role and verdict are held to their own ink and nothing more: the role cell
-     stacks a short badge over two figures, and the score meter reads fine at half
-     the width it used to take. Every pixel they give back goes to the message,
-     which is the only column whose content has no natural end. */
-  --fleet-columns: 18px minmax(80px, 0.4fr) minmax(72px, 0.6fr) 48px 76px
+     heads a short badge over a two-column table of engine and spend, and the score
+     meter reads fine at half the width it used to take. Every pixel they give back
+     goes to the message, which is the only column whose content has no natural end.
+
+     The role floor is the measured max-content of the widest real line — a codex
+     engine name beside its figure, 121px. It was 80px while the cell stacked one
+     item per row, and holding it there after the pairing spilled that line into the
+     task column below the container's 690px threshold, where the floors are all a
+     column gets. The table is already wider than that 690px minimum at those sizes
+     and scrolls, so the 44px is paid in scroll distance, not in another column. */
+  --fleet-columns: 18px minmax(124px, 0.4fr) minmax(72px, 0.6fr) 48px 76px
     minmax(104px, 0.45fr) minmax(200px, 3fr);
   --fleet-meter-height: var(--space-1);
   /* The heading is pinned to this height and the column header sticks exactly
@@ -1210,11 +1217,43 @@ button {
   background: var(--state-blocked);
 }
 
+/* A two-column table, not a stack. Column one names the engine, column two prints what
+   that engine spent, so each line answers one question about one engine and the two
+   figures form a column that can be compared without being read. Stacked, the same five
+   children made a codex row nearly twice the height of a Claude row and split one
+   reading unit — this model, this spend — across two lines.
+
+   The tracks are content-sized, so the second column starts right after the longest
+   model name in this row. Rhythm is the contrast between the two gaps: 4px down, 8px
+   across, tight enough that the two engine lines read as one group under the badge. */
 .fleet-cell.-role {
   align-items: center;
+  column-gap: var(--space-2);
   display: grid;
-  gap: var(--space-1);
+  grid-template-columns: max-content max-content;
   justify-items: start;
+  row-gap: var(--space-1);
+}
+
+/* Both span the tracks: the badge heads the table rather than sitting in a column of
+   it, and an unknown role's raw label is a caption on the whole cell. */
+.fleet-cell.-role > .role-badge,
+.fleet-cell.-role > .raw-label {
+  grid-column: 1 / -1;
+}
+
+/* Pinned, not auto-placed. A row whose Claude transcript reported no model renders no
+   chip for it, and auto-placement then slid the Claude figure into column one and pulled
+   the codex model up beside it — one line claiming the other engine's name. Naming the
+   column keeps the figures under each other whichever chips are present. */
+.fleet-cell.-role > .role-tokens {
+  grid-column: 2;
+}
+
+/* Nothing in the model column means no column to gap away from, and the lone figure
+   would otherwise hang 8px off the badge above it. */
+.fleet-cell.-role:not(:has(.role-model)) {
+  column-gap: 0;
 }
 
 .role-badge {
@@ -1299,10 +1338,10 @@ button {
   --token-ink: var(--muted);
 }
 
-/* The external engine's spend, as a second smaller figure under the Claude one.
-   It sets size only and deliberately NOT --token-ink: the fleet's tier rules above
-   have to reach it, so one amber means one amount down the whole column. The `cdx`
-   prefix carries the vendor instead. */
+/* The external engine's spend, as a second smaller figure on the line below the Claude
+   one. It sets size only and deliberately NOT --token-ink: the fleet's tier rules above
+   have to reach it, so one amber means one amount down the whole column. The model name
+   in the column beside it carries the vendor instead. */
 .role-tokens.-codex {
   font-size: var(--text-xs);
 }

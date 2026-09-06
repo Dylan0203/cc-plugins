@@ -574,9 +574,26 @@ describe("Tokens under the role chip", () => {
     });
 
     expect(html).toContain(">35.1K</span>");
-    expect(html).toContain(">cdx 54.8K</span>");
+    expect(html).toContain(">54.8K</span>");
     // Merged it would read 89.9K, which is a Claude agent that never existed.
     expect(html).not.toContain(">89.9K<");
+  });
+
+  test("labels a codex figure `codex` when the rollout reported no model", () => {
+    const html = rowHtml({
+      key: "dev:ui/01#1",
+      role: "dev",
+      ref: "ui/01",
+      status: "finished",
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 35_100 },
+      codexUsage: { input: 0, output: 500, cacheRead: 900, cacheWrite: 54_800 },
+    });
+
+    // The figure lost its `cdx` prefix to the model column beside it, so an unnamed
+    // codex line would leave a bare number with nothing saying whose spend it is.
+    expect(html).toContain(
+      '<span class="role-model -codex" title="codex">codex</span>',
+    );
   });
 
   test("tiers the codex figure on the same thresholds as the Claude one", () => {
