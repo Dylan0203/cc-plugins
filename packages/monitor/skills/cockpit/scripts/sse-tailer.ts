@@ -43,7 +43,8 @@ export function sseResponse(stream: ReadableStream): Response {
 // Poll cadences are env-tunable and read per request: ops can trade latency for
 // cost, and tests lower them to stay within their timeouts.
 const resolvePollMs = () => Number(process.env.COCKPIT_RESOLVE_POLL_MS) || 500;
-export const tailPollMs = () => Number(process.env.COCKPIT_TAIL_POLL_MS) || 2_000;
+export const tailPollMs = () =>
+  Number(process.env.COCKPIT_TAIL_POLL_MS) || 2_000;
 
 export type WatchFn = (path: string, cb: () => void) => FSWatcher;
 
@@ -166,12 +167,33 @@ export function createTailStream(source: TailSource): Response {
           // byte cursor is stale — restart from the top of the current file and
           // re-bind the watcher (the old one may be stuck on the old inode).
           if (st.ino !== inode || st.size < offset) {
-            offset = 0;
-            partial = "";
+            // Same job as attach, so the same seam: readBacklog is where a
+            // provider bounds the read (transcript-stream takes the last N lines
+            // backward). Reading it here materialised a rotated multi-GB
+            // transcript whole, and would have replayed every line to the client.
+            //
+            // Read before committing anything. A reset that half-applies — new
+            // inode, old offset — stops looking like a replacement on the next
+            // poll and resumes mid-file, silently swallowing the new file's head.
+            const {
+              complete,
+              partial: trailing,
+              backlogMeta,
+            } = source.readBacklog(filePath, st.size);
+
             if (st.ino !== inode) {
               inode = st.ino;
               attachFileWatcher();
             }
+            partial = trailing;
+            offset = st.size;
+            source.emit(enqueue, complete);
+            // The window moved, so the reverse-scroll cursor has to move with
+            // it; the old one indexes a file that is no longer there.
+            enqueue(
+              `event: backlog-done\ndata: ${JSON.stringify(backlogMeta ?? {})}\n\n`,
+            );
+            return;
           }
           if (st.size <= offset) return;
           const length = st.size - offset;
