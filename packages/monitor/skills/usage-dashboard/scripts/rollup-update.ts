@@ -13,7 +13,10 @@
 
 import { Database } from "bun:sqlite";
 import { statSync } from "node:fs";
-import { readJsonlLines, type LineCursor } from "./jsonl-lines";
+import {
+  readJsonlLines,
+  type LineCursor,
+} from "../../shared/scripts/jsonl-lines";
 import {
   dedupKey,
   hourStartMs,
@@ -49,10 +52,8 @@ type ParsedSlice = {
   requestKeys: string[];
 };
 
-// Fold a stream of complete lines into per-bucket token sums. `seenRun` is the
-// in-run dedup set; `dbSeen` checks the persistent seen_requests so a request
-// already billed in a prior run is never re-counted. Taking an iterable rather
-// than a string is what keeps a 2.4 GB cold ingest off the heap.
+// Fold complete lines into per-bucket token sums. `seenRun` dedups within the
+// run; `dbSeen` checks seen_requests so a prior run's billing never repeats.
 function parseSlice(
   lines: Iterable<string>,
   file: string,
@@ -133,16 +134,10 @@ function ingestFile(db: Database, file: string, nowMs: number): boolean {
   // Nothing new since last complete-line boundary.
   if (size <= startByte) return true;
 
-  // Read only the appended bytes, and stream them. A live session transcript
-  // grows to tens of MB while each run ingests a few KB, so reading the whole
-  // file to slice off the tail is the single most wasteful thing this function
-  // could do — and on a cold `startByte = 0` (fresh DB, --rebuild, schema bump,
-  // detected truncation) the appended bytes *are* the whole file, which at the
-  // 2.4 GB seen in the wild is an uncatchable SIGTRAP. See jsonl-lines.ts.
-  //
-  // `emitPartial: false` is what makes the trailing partial line (file still
-  // being written) wait for the next run; the cursor reports the boundary that
-  // the old `lastIndexOf(0x0a)` computed.
+  // Streamed, not sliced whole: on a cold `startByte = 0` (fresh DB, --rebuild,
+  // schema bump, detected truncation) the appended bytes are the entire file.
+  // `emitPartial: false` leaves a half-written line for the next run; the cursor
+  // reports the boundary the old `lastIndexOf(0x0a)` computed.
   const cursor: LineCursor = { bytesConsumed: startByte };
   const seenRun = new Set<string>();
   const { rows, requestKeys } = parseSlice(

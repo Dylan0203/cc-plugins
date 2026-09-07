@@ -12,7 +12,7 @@ import {
 import { Database } from "bun:sqlite";
 import { dirname, join } from "node:path";
 import { dedupKey, hourStartMs, usageTokenTotal, walkFiles } from "./dedup";
-import { readJsonlLines } from "./jsonl-lines";
+import { readJsonlLines } from "../../shared/scripts/jsonl-lines";
 import { aggregateProjectCosts } from "./project-cost";
 import { mergeDailyActivity } from "./daily-activity";
 import { allHourlyRows, openRollupDb } from "./rollup-db";
@@ -1520,8 +1520,6 @@ function parseTranscriptUsage(): {
   const transcriptFiles = walkFiles(PROJECTS_DIR, ".jsonl");
 
   for (const file of transcriptFiles) {
-    // Streamed, not read whole: transcripts here reach 2.4 GB and a whole-file
-    // read is an uncatchable SIGTRAP on bun. See jsonl-lines.ts.
     for (const line of readJsonlLines(file)) {
       if (!line.trim()) continue;
       let entry: TranscriptEntry;
@@ -1662,8 +1660,7 @@ function parseTranscriptUsage(): {
 }
 
 function readCodexSession(file: string): CodexSessionSummary | null {
-  // Keep the "unreadable file → null" contract the whole-file read gave the
-  // caller; the streaming reader below only ever yields zero lines instead.
+  // Keeps the "unreadable file → null" contract; the reader yields zero lines.
   if (!existsSync(file)) return null;
 
   let latest: CodexTokenUsage | null = null;

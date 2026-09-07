@@ -46,7 +46,7 @@ describe("readJsonlLines", () => {
   });
 
   test("多位元組字元橫跨 chunk 邊界仍完整", () => {
-    // 「中」是 3 bytes。用 4-byte chunk 保證它一定被切開。
+    // 「中」是 3 bytes，4-byte chunk 保證切開它。
     const path = write("utf8.jsonl", "中文\n中\n文中文\n");
     expect(collect(path, { chunkSize: 4 })).toEqual(["中文", "中", "文中文"]);
   });
@@ -94,8 +94,7 @@ describe("readJsonlLines", () => {
 });
 
 describe("cursor.bytesConsumed", () => {
-  // rollup-update 拿它當 bytes_parsed，語意必須等同舊的 lastIndexOf(0x0a) 邊界：
-  // 消化到最後一個完整行的結尾（含換行）為止。
+  // rollup-update 拿它當 bytes_parsed，語意必須等同舊的 lastIndexOf(0x0a) 邊界。
   test("等同最後一個換行後的位置", () => {
     const body = "aaa\nbbb\nccc\n";
     const path = write("consumed.jsonl", body);
@@ -135,12 +134,8 @@ describe("cursor.bytesConsumed", () => {
 });
 
 describe("超過 JSC 字串上限的檔案", () => {
-  // 這是唯一能證明修好了的測試。舊寫法（readFileSync + split）在這個 fixture 上
-  // 是 SIGTRAP / exit 133 —— bun 的 assertion 直接帶走 process，try/catch 接不到，
-  // 所以「沒 crash」本身就是斷言的一部分：這個測試跑完就代表沒退回。
-  //
-  // fixture 用 APFS 稀疏檔：只實際寫幾個 byte，ftruncate 把邏輯大小撐到 2.4 GB，
-  // 中間的洞讀出來是 \0。實體佔用接近 0，建立是瞬間的。永遠在 tmpdir，不進 repo。
+  // 唯一能證明修好了的測試：舊寫法在這個 fixture 上直接帶走 process，所以
+  // 「跑完了」本身就是斷言的一部分。fixture 是 tmpdir 裡的 APFS 稀疏檔。
   const bigDir = mkdtempSync(join(tmpdir(), "jsonl-lines-big-"));
   const bigPath = join(bigDir, "huge.jsonl");
 
@@ -151,21 +146,18 @@ describe("超過 JSC 字串上限的檔案", () => {
   test("2.4 GB 檔案的頭尾兩筆都讀得到", () => {
     const first = JSON.stringify({ marker: "first" });
     const last = JSON.stringify({ marker: "last" });
-    // 2^31 是 JSC 的字串上限量級；2.4 GB 確定跨過去。
-    const holeEnd = 2_400_000_000;
+    const holeEnd = 2_400_000_000; // 跨過 2^31 的 JSC 字串上限量級
 
     const fd = openSync(bigPath, "w");
     try {
       writeSync(fd, `${first}\n`);
-      // 每 ~600 KB 插一個換行，讓中間的洞被切成很多短行，而不是一條 2.4 GB
-      // 的長行 —— 後者會讓串流本身撞上同一個上限。
+      // 每 ~600 KB 一個換行：一條 2.4 GB 的長行會讓串流撞上同一個上限。
       const nl = Buffer.from("\n");
       for (let at = 600_000; at < holeEnd; at += 600_000) {
         writeSync(fd, nl, 0, 1, at);
       }
       ftruncateSync(fd, holeEnd);
-      // Lead with a newline so the last record is a clean line rather than the
-      // tail of the \0-filled hole.
+      // 前導換行，讓最後一筆是完整的一行而不是接在 \0 洞後面。
       writeSync(fd, Buffer.from(`\n${last}\n`), 0, last.length + 2, holeEnd);
     } finally {
       closeSync(fd);
@@ -176,7 +168,6 @@ describe("超過 JSC 字串上限的檔案", () => {
     let lineCount = 0;
     for (const line of readJsonlLines(bigPath)) {
       lineCount += 1;
-      // 洞的部分是 \0 填充，JSON.parse 會失敗——正是真實迴圈的行為。
       let entry: { marker?: string };
       try {
         entry = JSON.parse(line);
