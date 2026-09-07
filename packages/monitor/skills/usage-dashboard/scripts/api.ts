@@ -12,6 +12,7 @@ import {
 import { Database } from "bun:sqlite";
 import { dirname, join } from "node:path";
 import { dedupKey, hourStartMs, usageTokenTotal, walkFiles } from "./dedup";
+import { readJsonlLines } from "./jsonl-lines";
 import { aggregateProjectCosts } from "./project-cost";
 import { mergeDailyActivity } from "./daily-activity";
 import { allHourlyRows, openRollupDb } from "./rollup-db";
@@ -1207,8 +1208,7 @@ function parseHistory(): {
   if (!existsSync(HISTORY))
     return { byProject, weekHourMatrix, dailyHistory, dailyHourCounts };
 
-  const raw = readFileSync(HISTORY, "utf-8");
-  for (const line of raw.split("\n")) {
+  for (const line of readJsonlLines(HISTORY)) {
     if (!line.trim()) continue;
     let entry: HistoryEntry;
     try {
@@ -1520,14 +1520,9 @@ function parseTranscriptUsage(): {
   const transcriptFiles = walkFiles(PROJECTS_DIR, ".jsonl");
 
   for (const file of transcriptFiles) {
-    let raw = "";
-    try {
-      raw = readFileSync(file, "utf-8");
-    } catch {
-      continue;
-    }
-
-    for (const line of raw.split("\n")) {
+    // Streamed, not read whole: transcripts here reach 2.4 GB and a whole-file
+    // read is an uncatchable SIGTRAP on bun. See jsonl-lines.ts.
+    for (const line of readJsonlLines(file)) {
       if (!line.trim()) continue;
       let entry: TranscriptEntry;
       try {
@@ -1667,12 +1662,9 @@ function parseTranscriptUsage(): {
 }
 
 function readCodexSession(file: string): CodexSessionSummary | null {
-  let raw = "";
-  try {
-    raw = readFileSync(file, "utf-8");
-  } catch {
-    return null;
-  }
+  // Keep the "unreadable file → null" contract the whole-file read gave the
+  // caller; the streaming reader below only ever yields zero lines instead.
+  if (!existsSync(file)) return null;
 
   let latest: CodexTokenUsage | null = null;
   let id: string | null = null;
@@ -1684,7 +1676,7 @@ function readCodexSession(file: string): CodexSessionSummary | null {
   let toolCalls = 0;
   const tokenEvents: Array<{ timestampMs: number; usage: CodexTokenUsage }> =
     [];
-  for (const line of raw.split("\n")) {
+  for (const line of readJsonlLines(file)) {
     if (!line.trim()) continue;
     let entry: {
       timestamp?: string;

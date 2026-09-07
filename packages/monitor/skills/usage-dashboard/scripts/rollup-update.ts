@@ -12,7 +12,8 @@
 // the hour buckets identical by construction instead of by hand.
 
 import { Database } from "bun:sqlite";
-import { closeSync, openSync, readSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
+import { readJsonlLines, type LineCursor } from "./jsonl-lines";
 import {
   dedupKey,
   hourStartMs,
@@ -48,11 +49,12 @@ type ParsedSlice = {
   requestKeys: string[];
 };
 
-// Parse a UTF-8 tail slice (already cut at \n byte boundaries) into per-bucket
-// token sums. `seenRun` is the in-run dedup set; `dbSeen` checks the persistent
-// seen_requests so a request already billed in a prior run is never re-counted.
+// Fold a stream of complete lines into per-bucket token sums. `seenRun` is the
+// in-run dedup set; `dbSeen` checks the persistent seen_requests so a request
+// already billed in a prior run is never re-counted. Taking an iterable rather
+// than a string is what keeps a 2.4 GB cold ingest off the heap.
 function parseSlice(
-  text: string,
+  lines: Iterable<string>,
   file: string,
   seenRun: Set<string>,
   dbSeen: (key: string) => boolean,
@@ -60,7 +62,7 @@ function parseSlice(
   const rows = new Map<string, HourlyRow>();
   const requestKeys: string[] = [];
 
-  for (const line of text.split("\n")) {
+  for (const line of lines) {
     if (!line.trim()) continue;
     let entry: TranscriptEntry;
     try {
@@ -131,29 +133,29 @@ function ingestFile(db: Database, file: string, nowMs: number): boolean {
   // Nothing new since last complete-line boundary.
   if (size <= startByte) return true;
 
-  // Read only the appended bytes. A live session transcript grows to tens of MB
-  // while each run ingests a few KB, so reading the whole file to slice off the
-  // tail is the single most wasteful thing this function could do.
-  let tail: Buffer;
-  try {
-    const fd = openSync(file, "r");
-    try {
-      tail = Buffer.allocUnsafe(size - startByte);
-      readSync(fd, tail, 0, tail.length, startByte);
-    } finally {
-      closeSync(fd);
-    }
-  } catch {
-    return true;
-  }
+  // Read only the appended bytes, and stream them. A live session transcript
+  // grows to tens of MB while each run ingests a few KB, so reading the whole
+  // file to slice off the tail is the single most wasteful thing this function
+  // could do — and on a cold `startByte = 0` (fresh DB, --rebuild, schema bump,
+  // detected truncation) the appended bytes *are* the whole file, which at the
+  // 2.4 GB seen in the wild is an uncatchable SIGTRAP. See jsonl-lines.ts.
+  //
+  // `emitPartial: false` is what makes the trailing partial line (file still
+  // being written) wait for the next run; the cursor reports the boundary that
+  // the old `lastIndexOf(0x0a)` computed.
+  const cursor: LineCursor = { bytesConsumed: startByte };
+  const seenRun = new Set<string>();
+  const { rows, requestKeys } = parseSlice(
+    readJsonlLines(file, { start: startByte, emitPartial: false, cursor }),
+    file,
+    seenRun,
+    (k) => hasSeenRequest(db, k),
+  );
 
-  // Only consume up to the last newline; a trailing partial line (file still
-  // being written) waits for the next run. Slicing the Buffer at \n bytes is
-  // UTF-8 safe — 0x0a never occurs inside a multibyte sequence.
-  const lastNl = tail.lastIndexOf(0x0a);
-  const boundary = lastNl < 0 ? startByte : startByte + lastNl + 1;
+  const boundary = cursor.bytesConsumed;
   if (boundary <= startByte) {
     // Grew, but no new *complete* line yet — leave bytes_parsed where it is.
+    // An unreadable file lands here too, and is likewise left for the next run.
     upsertIngestedFile(
       db,
       { path: file, bytes_parsed: startByte, mtime_ms: mtimeMs },
@@ -161,12 +163,6 @@ function ingestFile(db: Database, file: string, nowMs: number): boolean {
     );
     return true;
   }
-
-  const text = tail.subarray(0, boundary - startByte).toString("utf-8");
-  const seenRun = new Set<string>();
-  const { rows, requestKeys } = parseSlice(text, file, seenRun, (k) =>
-    hasSeenRequest(db, k),
-  );
 
   const apply = db.transaction(() => {
     for (const row of rows.values()) addHourlyRow(db, row);
