@@ -8,10 +8,8 @@ const DEFAULT_CHUNK = 1 << 20;
  *
  * Chunked because `size - from` is bounded by nothing: `nextCursor` resets to 0
  * on a truncated or replaced file, and a cold pass starts there, so the range is
- * routinely the whole file — 2.4 GB for a Claude transcript, which no single
- * Buffer-plus-string survives.
- *
- * Chunks are freshly allocated so a caller may hold one past the next iteration.
+ * routinely the whole file. Chunks are freshly allocated, so a caller may hold
+ * one past the next iteration.
  */
 export function* readRangeChunks(
   path: string,
@@ -68,17 +66,13 @@ export type TailState = {
 };
 
 /**
- * Tail `file` from `state.cursor` to `size`, handing each complete line to
- * `onLine` and calling `onReset` first when the file was truncated or replaced.
+ * Tail `file` from `state.cursor` to `size`, calling `onReset` first when the
+ * file was truncated or replaced.
  *
- * The two orderings here are the whole reason this is shared rather than written
- * per caller — both are invisible at the call site and both fail silently:
- *
- * - The generator opens lazily, so the first chunk is pulled *before* `onReset`.
- *   A file that cannot be opened must not clear state it will never refill.
- * - `cursor` advances per chunk, not once at the end. A read that dies partway
- *   has already handed lines to `onLine`, so a cursor left behind re-ingests them
- *   on the next pass.
+ * Shared for two orderings invisible at the call site that both fail silently:
+ * the generator opens lazily, so the first chunk is pulled before `onReset` (an
+ * unopenable file must not clear state it will never refill); and `cursor`
+ * advances per chunk, since `onLine` already has those lines.
  */
 export function tailFileChunks<S extends TailState>(
   file: string,

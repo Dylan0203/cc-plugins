@@ -120,12 +120,10 @@ export function createTailStream(source: TailSource): Response {
   let inode = -1;
   let offset = 0;
   let partial = "";
-  // Whether `offset` was ever established by a successful backlog read. Attach
-  // sets `inode` before it reads, so without this a thrown backlog leaves a
-  // stale-looking cursor of 0 that the append path would honour — reading the
-  // whole file, which is the failure this whole change exists to remove.
-  // Not replaceable by `offset === 0`: an empty file anchors at 0 legitimately,
-  // and testing the number instead would re-run the backlog on every poll.
+  // Whether `offset` came from a successful backlog read. Attach sets `inode`
+  // before it reads, so a thrown backlog would otherwise leave a cursor of 0
+  // that the append path honours — reading the whole file. Not `offset === 0`:
+  // an empty file anchors at 0 legitimately.
   let anchored = false;
 
   function cleanup(): void {
@@ -174,14 +172,10 @@ export function createTailStream(source: TailSource): Response {
           // byte cursor is stale — restart from the top of the current file and
           // re-bind the watcher (the old one may be stuck on the old inode).
           if (!anchored || st.ino !== inode || st.size < offset) {
-            // Same job as attach, so the same seam: readBacklog is where a
-            // provider bounds the read (transcript-stream takes the last N lines
-            // backward). Reading it here materialised a rotated multi-GB
-            // transcript whole, and would have replayed every line to the client.
-            //
-            // Read before committing anything. A reset that half-applies — new
-            // inode, old offset — stops looking like a replacement on the next
-            // poll and resumes mid-file, silently swallowing the new file's head.
+            // Same seam as attach: readBacklog is where a provider bounds the
+            // read. Reading it here materialised a rotated multi-GB transcript
+            // whole. Nothing is committed until it returns — a half-applied
+            // reset stops looking like one and resumes mid-file.
             const {
               complete,
               partial: trailing,
