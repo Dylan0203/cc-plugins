@@ -78,18 +78,18 @@ export function* readJsonlLines(
       for (;;) {
         const nl = view.indexOf(NEWLINE, from);
         if (nl === -1) break;
-        const seg = view.subarray(from, nl);
+        const len = nl - from;
         let line: string;
         if (carryLen > 0) {
-          // Consumed before the next read, so `seg` needs no copy out of `chunk`.
-          carry.push(seg);
-          line = Buffer.concat(carry, carryLen + seg.length).toString("utf-8");
-          consumed += carryLen + seg.length + 1;
+          // Consumed before the next read, so the view needs no copy out of `chunk`.
+          carry.push(view.subarray(from, nl));
+          line = Buffer.concat(carry, carryLen + len).toString("utf-8");
+          consumed += carryLen + len + 1;
           carry.length = 0;
           carryLen = 0;
         } else {
           line = view.toString("utf-8", from, nl);
-          consumed += seg.length + 1;
+          consumed += len + 1;
         }
         if (cursor) cursor.bytesConsumed = consumed;
         yield stripCr(line);

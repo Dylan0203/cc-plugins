@@ -40,18 +40,25 @@ afterEach(() => {
   delete process.env.COCKPIT_TAIL_POLL_MS;
 });
 
+// Every synthetic source below reads its file whole; only the windowing and the
+// metadata on top of it differ per test.
+function readWholeSync(path: string, size: number): Buffer {
+  const buf = Buffer.allocUnsafe(size);
+  const fd = openSync(path, "r");
+  try {
+    readSync(fd, buf, 0, size, 0);
+  } finally {
+    closeSync(fd);
+  }
+  return buf;
+}
+
 // A minimal line-oriented source: every non-empty line becomes one SSE frame.
 function lineSource(path: string, watch?: WatchFn): TailSource {
   return {
     resolve: (): ResolveResult => ({ kind: "ready", path }),
     readBacklog: (p, size) => {
-      const buf = Buffer.allocUnsafe(size);
-      const fd = openSync(p, "r");
-      try {
-        readSync(fd, buf, 0, size, 0);
-      } finally {
-        closeSync(fd);
-      }
+      const buf = readWholeSync(p, size);
       return splitCompleteLines(buf.toString("utf-8"));
     },
     emit: (enqueue, text) => {
@@ -180,13 +187,7 @@ describe("createTailStream", () => {
       resolve: (): ResolveResult => ({ kind: "ready", path }),
       readBacklog: (p, size) => {
         backlogCalls += 1;
-        const buf = Buffer.allocUnsafe(size);
-        const fd = openSync(p, "r");
-        try {
-          readSync(fd, buf, 0, size, 0);
-        } finally {
-          closeSync(fd);
-        }
+        const buf = readWholeSync(p, size);
         const all = buf.toString("utf-8").split("\n").filter(Boolean);
         return { complete: all.slice(-1).join("\n"), partial: "" };
       },
@@ -247,13 +248,7 @@ describe("createTailStream", () => {
           failNext = false;
           throw new Error("read failed");
         }
-        const buf = Buffer.allocUnsafe(size);
-        const fd = openSync(p, "r");
-        try {
-          readSync(fd, buf, 0, size, 0);
-        } finally {
-          closeSync(fd);
-        }
+        const buf = readWholeSync(p, size);
         return splitCompleteLines(buf.toString("utf-8"));
       },
       emit: (enqueue, text) => {
@@ -298,13 +293,7 @@ describe("createTailStream", () => {
     const source: TailSource = {
       resolve: (): ResolveResult => ({ kind: "ready", path }),
       readBacklog: (p, size) => {
-        const buf = Buffer.allocUnsafe(size);
-        const fd = openSync(p, "r");
-        try {
-          readSync(fd, buf, 0, size, 0);
-        } finally {
-          closeSync(fd);
-        }
+        const buf = readWholeSync(p, size);
         const all = buf.toString("utf-8").split("\n").filter(Boolean);
         const kept = all.slice(-1);
         return {

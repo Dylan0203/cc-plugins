@@ -59,3 +59,56 @@ export function nextCursor(
   if (size < prev) return { from: 0, reset: true };
   return { from: prev, reset: false };
 }
+
+/** The bookkeeping `tailFileChunks` owns; a caller adds its own domain fields. */
+export type TailState = {
+  cursor: number;
+  partial: string;
+  decoder: TextDecoder;
+};
+
+/**
+ * Tail `file` from `state.cursor` to `size`, handing each complete line to
+ * `onLine` and calling `onReset` first when the file was truncated or replaced.
+ *
+ * The two orderings here are the whole reason this is shared rather than written
+ * per caller — both are invisible at the call site and both fail silently:
+ *
+ * - The generator opens lazily, so the first chunk is pulled *before* `onReset`.
+ *   A file that cannot be opened must not clear state it will never refill.
+ * - `cursor` advances per chunk, not once at the end. A read that dies partway
+ *   has already handed lines to `onLine`, so a cursor left behind re-ingests them
+ *   on the next pass.
+ */
+export function tailFileChunks<S extends TailState>(
+  file: string,
+  state: S,
+  size: number,
+  onReset: (state: S) => void,
+  onLine: (state: S, line: string) => void,
+  chunkSize?: number, // Only tests need to set this.
+): void {
+  const next = nextCursor(state.cursor, size);
+  const from = next.reset ? 0 : next.from;
+  if (size <= from) return; // Nothing new since the last pass.
+
+  const chunks = readRangeChunks(file, from, size, chunkSize);
+  const firstChunk = chunks.next();
+
+  if (next.reset) {
+    state.partial = "";
+    state.decoder.decode(); // Flush pending multi-byte state from the old content.
+    onReset(state);
+  }
+
+  let consumed = from;
+  for (let step = firstChunk; !step.done; step = chunks.next()) {
+    const text = state.decoder.decode(step.value, { stream: true });
+    const { complete, partial } = splitCompleteLines(state.partial + text);
+    state.partial = partial;
+    consumed += step.value.length;
+    state.cursor = consumed;
+
+    for (const line of complete) onLine(state, line);
+  }
+}
