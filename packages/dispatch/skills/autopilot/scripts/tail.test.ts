@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { nextCursor, readRange, splitCompleteLines } from "./tail";
+import { nextCursor, readRangeChunks, splitCompleteLines } from "./tail";
 
 describe("splitCompleteLines", () => {
   test("returns complete lines", () => {
@@ -59,7 +59,7 @@ describe("nextCursor", () => {
   });
 });
 
-describe("readRange", () => {
+describe("readRangeChunks", () => {
   function withTempFile(content: string, run: (path: string) => void): void {
     const dir = mkdtempSync(join(tmpdir(), "readrange-"));
     const path = join(dir, "log.txt");
@@ -71,31 +71,56 @@ describe("readRange", () => {
     }
   }
 
+  function readAll(path: string, from: number, size: number, chunk?: number) {
+    const parts = [...readRangeChunks(path, from, size, chunk)];
+    return {
+      text: Buffer.concat(parts.map((p) => Buffer.from(p))).toString(),
+      lengths: parts.map((p) => p.length),
+    };
+  }
+
   test("reads a byte range from the middle of a file", () => {
     withTempFile("0123456789", (path) => {
-      const bytes = readRange(path, 3, 7);
-      expect(Buffer.from(bytes).toString()).toBe("3456");
+      expect(readAll(path, 3, 7).text).toBe("3456");
     });
   });
 
   test("reads from zero to the full size", () => {
     withTempFile("hello", (path) => {
-      const bytes = readRange(path, 0, 5);
-      expect(Buffer.from(bytes).toString()).toBe("hello");
+      expect(readAll(path, 0, 5).text).toBe("hello");
     });
   });
 
   test("returns fewer bytes than asked when the file is shorter than requested", () => {
     withTempFile("abc", (path) => {
-      const bytes = readRange(path, 0, 100);
-      expect(Buffer.from(bytes).toString()).toBe("abc");
+      expect(readAll(path, 0, 100).text).toBe("abc");
     });
   });
 
   test("returns an empty range when from equals size", () => {
     withTempFile("abc", (path) => {
-      const bytes = readRange(path, 3, 3);
-      expect(bytes.length).toBe(0);
+      expect(readAll(path, 3, 3).lengths).toEqual([]);
+    });
+  });
+
+  // The point of the rewrite: no allocation scales with the range. Asserting
+  // only on reassembled content would pass on the old whole-file read too.
+  test("每個 chunk 都不超過上限，且會切成多塊", () => {
+    withTempFile("0123456789abcdefghij", (path) => {
+      const { text, lengths } = readAll(path, 0, 20, 6);
+      expect(text).toBe("0123456789abcdefghij");
+      expect(lengths).toEqual([6, 6, 6, 2]);
+    });
+  });
+
+  // All three callers decode immediately and would not notice a reused buffer;
+  // a fourth that batched chunks would, only on multi-chunk files.
+  test("chunk 之間不共用 buffer", () => {
+    withTempFile("aaaabbbbcccc", (path) => {
+      const held = [...readRangeChunks(path, 0, 12, 4)].map((c) =>
+        Buffer.from(c.buffer, c.byteOffset, c.length),
+      );
+      expect(held.map((b) => b.toString())).toEqual(["aaaa", "bbbb", "cccc"]);
     });
   });
 });

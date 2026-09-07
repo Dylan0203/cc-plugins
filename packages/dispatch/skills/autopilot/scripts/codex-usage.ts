@@ -8,7 +8,7 @@ import { readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, sep } from "node:path";
 import { fleetIdentity } from "./fleet";
-import { nextCursor, readRange, splitCompleteLines } from "./tail";
+import { nextCursor, readRangeChunks, splitCompleteLines } from "./tail";
 import { addCounts, emptyCounts, type AgentUsage } from "./usage-types";
 
 /** One codex CLI run, distilled from its rollout file. */
@@ -202,7 +202,9 @@ function processFile(file: string, state: FileState, size: number): void {
   const from = next.reset ? 0 : next.from;
   if (size <= from) return; // Nothing new since the last pass.
 
-  const bytes = readRange(file, from, size);
+  // Pulled before the reset below: a file we cannot open must not clear state.
+  const chunks = readRangeChunks(file, from, size);
+  const firstChunk = chunks.next();
 
   if (next.reset) {
     // A reset re-reads from byte 0, so nothing derived from the old content may
@@ -218,12 +220,17 @@ function processFile(file: string, state: FileState, size: number): void {
     state.counts = emptyCounts();
   }
 
-  const text = state.decoder.decode(bytes, { stream: true });
-  const { complete, partial } = splitCompleteLines(state.partial + text);
-  state.partial = partial;
-  state.cursor = size;
+  // Per-chunk cursor: a read that dies partway resumes rather than re-counts.
+  let consumed = from;
+  for (let step = firstChunk; !step.done; step = chunks.next()) {
+    const text = state.decoder.decode(step.value, { stream: true });
+    const { complete, partial } = splitCompleteLines(state.partial + text);
+    state.partial = partial;
+    consumed += step.value.length;
+    state.cursor = consumed;
 
-  for (const line of complete) ingestLine(state, line);
+    for (const line of complete) ingestLine(state, line);
+  }
 }
 
 /**

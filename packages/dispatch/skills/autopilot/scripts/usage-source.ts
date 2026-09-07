@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, sep } from "node:path";
-import { nextCursor, readRange, splitCompleteLines } from "./tail";
+import { nextCursor, readRangeChunks, splitCompleteLines } from "./tail";
 import {
   emptyCounts,
   replaceCounts,
@@ -401,8 +401,8 @@ function ingestLine(
 }
 
 /**
- * Tail one file from `state.cursor` to `size`. Reads new bytes first and only
- * mutates `state` once that read succeeds, so a throw from `readRange` (a lock, a
+ * Tail one file from `state.cursor` to `size`. Opens the file first and only
+ * mutates `state` once that open succeeds, so a throw from the read (a lock, a
  * permission blip) never leaves the file half-reset with its prior counts erased.
  */
 function processFile(
@@ -416,7 +416,10 @@ function processFile(
   const from = next.reset ? 0 : next.from;
   if (size <= from) return; // Nothing new since the last pass.
 
-  const bytes = readRange(file, from, size);
+  // The generator opens on the first pull, so pull before the reset below: a
+  // file we cannot open must not clear counts it will never refill.
+  const chunks = readRangeChunks(file, from, size);
+  const firstChunk = chunks.next();
 
   if (next.reset) {
     // A reset re-reads from byte 0, so nothing derived from the old content may
@@ -437,13 +440,18 @@ function processFile(
     state.membership = "pending";
   }
 
-  const text = state.decoder.decode(bytes, { stream: true });
-  const { complete, partial } = splitCompleteLines(state.partial + text);
-  state.partial = partial;
-  state.cursor = size;
+  // Per-chunk cursor: a read that dies partway resumes rather than re-counts.
+  let consumed = from;
+  for (let step = firstChunk; !step.done; step = chunks.next()) {
+    const text = state.decoder.decode(step.value, { stream: true });
+    const { complete, partial } = splitCompleteLines(state.partial + text);
+    state.partial = partial;
+    consumed += step.value.length;
+    state.cursor = consumed;
 
-  for (const line of complete) {
-    ingestLine(planDir, state, line, runId);
+    for (const line of complete) {
+      ingestLine(planDir, state, line, runId);
+    }
   }
 }
 
