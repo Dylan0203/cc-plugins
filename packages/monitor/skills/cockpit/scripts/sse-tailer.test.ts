@@ -283,6 +283,44 @@ describe("createTailStream", () => {
     expect(buf).toContain("TAIL");
   });
 
+  // attach sets `inode` before it reads the backlog, so a backlog that throws
+  // (the "vanished between resolve and read" case its own catch names) leaves
+  // inode set and offset at 0. Neither reset condition then holds, and the
+  // append path below reads `st.size - 0` — the whole file, which is the
+  // original bug on a 2.4 GB transcript.
+  test("attach 的 backlog 失敗後，不會退化成整檔 append 讀取", async () => {
+    const path = join(dir, "anchor.jsonl");
+    writeFileSync(path, "a\nb\nc\n");
+
+    let calls = 0;
+    const source: TailSource = {
+      resolve: (): ResolveResult => ({ kind: "ready", path }),
+      readBacklog: (p, size) => {
+        calls += 1;
+        if (calls === 1) throw new Error("vanished");
+        const all = readWholeSync(p, size)
+          .toString("utf-8")
+          .split("\n")
+          .filter(Boolean);
+        return { complete: all.slice(-1).join("\n"), partial: "" };
+      },
+      emit: (enqueue, text) => {
+        for (const line of text.split("\n")) {
+          const t = line.trim();
+          if (t) enqueue(`data: ${t}\n\n`);
+        }
+      },
+    };
+
+    const res = createTailStream(source);
+    const buf = await collect(res, (b) => b.includes("data: c"), 4000);
+
+    expect(calls).toBeGreaterThan(1); // the failed attach, then a real retry
+    expect(buf).toContain("data: c"); // the bounded window
+    expect(buf).not.toContain("data: a"); // never replayed whole
+    expect(buf).not.toContain("data: b");
+  });
+
   // The reset backlog is bounded, so the client needs the window it actually
   // got. Dropping backlogMeta leaves the reverse-scroll cursor pointing into the
   // file that was replaced: the panel shows a tail it cannot page back from.
